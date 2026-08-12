@@ -62,3 +62,22 @@ Para versões futuras do projeto.
 
 * **Repositório:** Git e GitHub.
 * **Metodologia Ágil:** Gestão de tarefas baseada em Kanban, utilizando o GitHub Projects para rastreabilidade de entregas e atribuição de responsáveis.
+* **Padrão Commits:** A equipe utiliza o padrão Conventional Commits para manter o histórico de versionamento claro, auditável e semântico durante as entregas do projeto: 
+  
+  
+  
+  `feat:` Adição de nova funcionalidade (ex: *feat: cria formulário de ficha de treino*). 
+  
+  `fix:` Correção de falhas e bugs. 
+  
+  `docs:` Alterações e adições na documentação oficial e README. 
+  
+  `chore:` Tarefas de configuração estrutural e atualização de dependências. 
+  
+  `style:` Ajustes visuais (CSS, HTML) e formatação de código. 
+  
+  `refactor:` Melhorias estruturais no código sem impacto na funcionalidade.
+
+---
+
+
