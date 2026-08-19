@@ -1,14 +1,14 @@
 # Documentação da Stack Tech (Arquitetura e ferramentas)
 
-**Projeto:** Edukação
+**Projeto:** Circula Gov - Livros
 
 **Disciplina:** Políticas de Segurança da informação
 
-O Edukção é uma plataforma web para conectar professores e alunos. O sistema permite prescrever treinos e realizar videochamadas para acompanhamento ao vivo, garantindo a melhor execução biomecânica. Construído com Django e PostgreSQL, possui design totalmente responsivo usando Tailwind e WebRTC, unindo a tecnologia e a qualidade do ensino motor.
+O Circula Gov - Livros é uma plataforma web para conectar prefeituras e entes governamentais na gestão, manutenção e empréstimo de livros didáticos ou não com o escopo de garantir a eficiência em licitações bem como na gestão de recursos públicos. O sistema permite gerenciamento de licitações, controle de estoque, empréstimos entre entes governamentais, como também o gerenciamento da disponibilização dos livros para os alunos das escolas públicas (reservas, devolução, controle de cadastro em geral). Construído com Python, Django e PostgreSQL, utiliza Tailwind e CSS, unindo a tecnologia e a qualidade do ensino motor.
 
 
 
-Nesta primeira versão (MVP - Produto Mínimo Viável), o sistema terá como foco central a gestão e prescrição de treinos, permitindo que o professor crie fichas personalizadas e o aluno acesse sua rotina de exercícios remotamente. 
+Nesta primeira versão (MVP - Produto Mínimo Viável), o sistema terá como foco central o gerenciamento de cadastro dos usuários e livros, em especial licitação, empréstimo, devolução 
 
 
 
@@ -18,7 +18,7 @@ Nesta primeira versão (MVP - Produto Mínimo Viável), o sistema terá como foc
 
 ## 1. Arquitetura do Sistema
 
-Para o projeto **Edukção**, selecionamos a arquitetura de software **Monolítica Modular**, aplicando o padrão de projeto **MVT (Model-View-Template)** uma vez que o próprio Django já fornece essa estrutura nativamente.
+Para o projeto **CirculaGov**, selecionamos a arquitetura de software **Monolítica Modular**, aplicando o padrão de projeto **MVT (Model-View-Template)** uma vez que o próprio Django já fornece essa estrutura nativamente.
 
 ### Justificativa da Arquitetura:
 
@@ -50,12 +50,6 @@ As ferramentas utilizadas na criação do sistema foram as seguintes:
 * **Estilização:** Tailwind CSS v3.4.
 * **Motor de Renderização:** Django Templates v5.2 LTS.
 
-### Integração de Streaming de Vídeo
-
-Para versões futuras do projeto.
-
-* **Tecnologia:** WebRTC via API externa (Jitsi / Daily.co).
-
 ---
 
 ## 3. Controle de Versão e Gestão
@@ -66,7 +60,7 @@ Para versões futuras do projeto.
   
   
   
-  `feat:` Adição de nova funcionalidade (ex: *feat: cria formulário de ficha de treino*). 
+  `feat:` Adição de nova funcionalidade (ex: *feat: cria formulário de histórico de empréstimos*). 
   
   `fix:` Correção de falhas e bugs. 
   
