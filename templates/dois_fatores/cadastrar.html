@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>CirculaGov — Ativar autenticação de dois fatores</title>
+</head>
+<body>
+    <h1>Ativar autenticação de dois fatores</h1>
+
+    {% if messages %}
+        {% for mensagem in messages %}
+            <p>{{ mensagem }}</p>
+        {% endfor %}
+    {% endif %}
+
+    {% if dispositivo.confirmado %}
+        <p>O 2FA já está ativado na sua conta.</p>
+    {% else %}
+        <p>
+            Cadastre este segredo em um app autenticador (Google Authenticator,
+            Authy, etc.) e digite o código de 6 dígitos que ele mostrar.
+        </p>
+
+        <p>Link de provisionamento: <code>{{ uri }}</code></p>
+        <p>Ou digite o segredo manualmente: <code>{{ dispositivo.segredo }}</code></p>
+
+        <form method="post">
+            {% csrf_token %}
+            <label for="codigo">Código do app autenticador:</label>
+            <input type="text" id="codigo" name="codigo" maxlength="6" required>
+            <button type="submit">Confirmar</button>
+        </form>
+    {% endif %}
+</body>
+</html>
