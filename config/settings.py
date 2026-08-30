@@ -46,6 +46,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'usuarios.middleware.TimeoutAbsolutoMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -96,6 +97,14 @@ AUTH_USER_MODEL = 'usuarios.Usuario'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'usuarios:inicio'
 LOGOUT_REDIRECT_URL = 'login'
+
+
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_AGE = 30 * 60
+
+TEMPO_MAXIMO_SESSAO_SEGUNDOS = 12 * 60 * 60
+
+SESSION_COOKIE_HTTPONLY = True
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
