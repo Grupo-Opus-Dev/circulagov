@@ -13,10 +13,18 @@ Class-based views
 Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+
+Usamos aqui para guardar as URLs utilizadas no sistema WEB.
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
+
+from usuarios.views import LoginComDoisFatoresView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('contas/login/', LoginComDoisFatoresView.as_view(), name='login'),
+    path('contas/', include('django.contrib.auth.urls')),
+    path('', include('usuarios.urls')),
+    path('dois-fatores/', include('dois_fatores.urls')),
 ]
