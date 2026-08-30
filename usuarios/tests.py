@@ -1,8 +1,12 @@
+import time
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 from django.test import TestCase
 from django.urls import reverse
+
+from usuarios.signals import CHAVE_INICIO_SESSAO
 
 Usuario = get_user_model()
 
@@ -65,3 +69,54 @@ class TesteLoginELogout(TestCase):
         self.assertEqual(resposta.status_code, 405)
         sessoes_com_essa_chave = Session.objects.filter(session_key=chave)
         self.assertTrue(sessoes_com_essa_chave.exists())
+
+
+class TesteTimeoutDeSessao(TestCase):
+    """Evidência funcional do requisito 1.9: a sessão precisa expirar depois
+    de um tempo máximo, mesmo que o usuário esteja ativo o tempo todo."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password=self.senha
+        )
+
+    def test_login_grava_marca_de_inicio_da_sessao(self):
+        self.client.login(username='usuario_teste', password=self.senha)
+        self.assertIn(CHAVE_INICIO_SESSAO, self.client.session)
+
+    def test_sessao_sem_marca_de_inicio_e_tratada_como_expirada(self):
+        """Fail closed: se por algum motivo a marca não foi gravada, a
+        sessão é tratada como inválida, não como "sem limite"."""
+        self.client.login(username='usuario_teste', password=self.senha)
+        sessao = self.client.session
+        del sessao[CHAVE_INICIO_SESSAO]
+        sessao.save()
+
+        resposta = self.client.get(reverse('usuarios:inicio'))
+
+        self.assertRedirects(resposta, reverse('login'))
+
+    def test_sessao_expira_apos_tempo_maximo_mesmo_com_uso_continuo(self):
+        self.client.login(username='usuario_teste', password=self.senha)
+        sessao = self.client.session
+        sessao[CHAVE_INICIO_SESSAO] = time.time() - (
+            settings.TEMPO_MAXIMO_SESSAO_SEGUNDOS + 60
+        )
+        sessao.save()
+
+        resposta = self.client.get(reverse('usuarios:inicio'))
+
+        self.assertRedirects(resposta, reverse('login'))
+
+    def test_sessao_dentro_do_tempo_maximo_continua_valida(self):
+        self.client.login(username='usuario_teste', password=self.senha)
+        sessao = self.client.session
+        sessao[CHAVE_INICIO_SESSAO] = time.time() - (
+            settings.TEMPO_MAXIMO_SESSAO_SEGUNDOS - 60
+        )
+        sessao.save()
+
+        resposta = self.client.get(reverse('usuarios:inicio'))
+
+        self.assertEqual(resposta.status_code, 200)
