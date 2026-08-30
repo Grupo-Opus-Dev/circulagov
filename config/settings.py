@@ -55,7 +55,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -85,11 +85,6 @@ DATABASES = {
 }
 
 
-# Hash de senha (requisito 1.1 / 1.2 do checklist de segurança)
-# Hasher customizado primeiro na lista => Django passa a usá-lo para todo
-# hash novo, com parâmetros de custo explícitos (ver usuarios/hashers.py).
-# Os hashers seguintes ficam só para o Django conseguir *verificar* logins
-# de senhas antigas, caso o algoritmo padrão mude no futuro.
 PASSWORD_HASHERS = [
     'usuarios.hashers.Argon2PasswordHasherCirculaGov',
     'django.contrib.auth.hashers.PBKDF2PasswordHasher',
@@ -97,6 +92,10 @@ PASSWORD_HASHERS = [
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'usuarios:inicio'
+LOGOUT_REDIRECT_URL = 'login'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
