@@ -1,35 +1,39 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="utf-8">
-    <title>CirculaGov — Ativar autenticação de dois fatores</title>
-</head>
-<body>
-    <h1>Ativar autenticação de dois fatores</h1>
+﻿{% extends "base.html" %}
+{% block titulo %}Ativar 2FA — CirculaGov{% endblock %}
+{% block conteudo %}
+<div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
+  <h1 class="text-xl font-semibold text-slate-900 mb-1">Autenticação de dois fatores</h1>
+  <p class="text-sm text-slate-500 mb-6">Proteja sua conta com um código extra a cada login.</p>
 
-    {% if messages %}
-        {% for mensagem in messages %}
-            <p>{{ mensagem }}</p>
-        {% endfor %}
-    {% endif %}
+  {% if messages %}
+    {% for mensagem in messages %}
+      <div class="mb-4 rounded-md {% if mensagem.tags == 'error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-green-50 border-green-200 text-green-700{% endif %} border px-4 py-3 text-sm">
+        {{ mensagem }}
+      </div>
+    {% endfor %}
+  {% endif %}
 
-    {% if dispositivo.confirmado %}
-        <p>O 2FA já está ativado na sua conta.</p>
-    {% else %}
-        <p>
-            Cadastre este segredo em um app autenticador (Google Authenticator,
-            Authy, etc.) e digite o código de 6 dígitos que ele mostrar.
-        </p>
+  {% if dispositivo.confirmado %}
+    <p class="text-sm text-slate-600">O 2FA já está ativado na sua conta.</p>
+  {% else %}
+    <p class="text-sm text-slate-600 mb-4">
+      Cadastre este segredo em um app autenticador (Google Authenticator, Authy, etc.) e digite o código de 6 dígitos que ele mostrar.
+    </p>
 
-        <p>Link de provisionamento: <code>{{ uri }}</code></p>
-        <p>Ou digite o segredo manualmente: <code>{{ dispositivo.segredo }}</code></p>
+    <div class="mb-4 rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-600 break-all">
+      <span class="font-medium text-slate-700">Segredo manual:</span> {{ dispositivo.segredo }}
+    </div>
 
-        <form method="post">
-            {% csrf_token %}
-            <label for="codigo">Código do app autenticador:</label>
-            <input type="text" id="codigo" name="codigo" maxlength="6" required>
-            <button type="submit">Confirmar</button>
-        </form>
-    {% endif %}
-</body>
-</html>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label for="codigo" class="block text-sm font-medium text-slate-700 mb-1">Código do app autenticador</label>
+        <input type="text" id="codigo" name="codigo" maxlength="6" required class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600">
+      </div>
+      <button type="submit" class="w-full rounded-md bg-blue-900 text-white text-sm font-medium py-2.5 hover:bg-blue-800 transition">
+        Confirmar
+      </button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
