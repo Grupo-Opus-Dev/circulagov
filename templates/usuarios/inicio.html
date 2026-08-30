@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>CirculaGov</title>
+</head>
+<body>
+    <p>Olá, {{ user.get_username }}.</p>
+
+    <p><a href="{% url 'dois_fatores:cadastrar' %}">Configurar autenticação de dois fatores</a></p>
+
+    <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit">Sair</button>
+    </form>
+</body>
+</html>

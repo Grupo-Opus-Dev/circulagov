@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>CirculaGov — Verificação em duas etapas</title>
+</head>
+<body>
+    <h1>Digite o código do seu app autenticador</h1>
+
+    {% if messages %}
+        {% for mensagem in messages %}
+            <p>{{ mensagem }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <label for="codigo">Código:</label>
+        <input type="text" id="codigo" name="codigo" maxlength="6" autofocus required>
+        <button type="submit">Entrar</button>
+    </form>
+</body>
+</html>
