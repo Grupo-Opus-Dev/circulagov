@@ -1,17 +1,22 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="utf-8">
-    <title>CirculaGov</title>
-</head>
-<body>
-    <p>Olá, {{ user.get_username }}.</p>
+﻿{% extends "base.html" %}
+{% block titulo %}Início — CirculaGov{% endblock %}
+{% block conteudo %}
+<div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8 text-center">
+    <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center mx-auto mb-4 font-semibold">
+        {{ user.get_username|first|upper }}
+    </div>
+    <h1 class="text-xl font-semibold text-slate-900 mb-1">Olá, {{ user.get_username }}</h1>
+    <p class="text-sm text-slate-500 mb-6">Você está autenticado no CirculaGov.</p>
 
-    <p><a href="{% url 'dois_fatores:cadastrar' %}">Configurar autenticação de dois fatores</a></p>
+    <a href="{% url 'dois_fatores:cadastrar' %}" class="block w-full rounded-md border border-slate-300 text-slate-700 text-sm font-medium py-2.5 mb-3 hover:bg-slate-50 transition">
+        Configurar autenticação de dois fatores
+    </a>
 
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
-        <button type="submit">Sair</button>
+        <button type="submit" class="w-full rounded-md bg-slate-900 text-white text-sm font-medium py-2.5 hover:bg-slate-800 transition">
+            Sair
+        </button>
     </form>
-</body>
-</html>
+</div>
+{% endblock %}
