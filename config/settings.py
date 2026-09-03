@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'usuarios',
     'dois_fatores',
+    'recuperacao_senha',
 ]
 
 MIDDLEWARE = [
@@ -106,6 +107,13 @@ SESSION_COOKIE_AGE = 30 * 60
 TEMPO_MAXIMO_SESSAO_SEGUNDOS = 12 * 60 * 60
 
 SESSION_COOKIE_HTTPONLY = True
+
+# E-mail de recuperação de senha (requisito 2.1).
+# Console backend: em vez de mandar e-mail de verdade, escreve no
+# terminal onde o servidor está rodando. Serve pra desenvolvimento e
+# para gerar evidência nos testes, sem precisar de um servidor SMTP.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'nao-responda@circulagov.local'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
