@@ -27,4 +27,5 @@ urlpatterns = [
     path('contas/', include('django.contrib.auth.urls')),
     path('', include('usuarios.urls')),
     path('dois-fatores/', include('dois_fatores.urls')),
+    path('recuperar-senha/', include('recuperacao_senha.urls')),
 ]

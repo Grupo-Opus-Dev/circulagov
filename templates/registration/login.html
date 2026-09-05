@@ -5,6 +5,14 @@
   <h1 class="text-xl font-semibold text-slate-900 mb-1">Entrar</h1>
   <p class="text-sm text-slate-500 mb-6">Acesse sua conta do CirculaGov.</p>
 
+  {% if messages %}
+    {% for mensagem in messages %}
+      <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+        {{ mensagem }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
   {% if form.non_field_errors %}
     {% for erro in form.non_field_errors %}
       <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -31,5 +39,9 @@
       Entrar
     </button>
   </form>
+
+  <p class="mt-4 text-sm text-center">
+    <a href="{% url 'recuperacao_senha:solicitar' %}" class="text-blue-700 hover:underline">Esqueci minha senha</a>
+  </p>
 </div>
 {% endblock %}
