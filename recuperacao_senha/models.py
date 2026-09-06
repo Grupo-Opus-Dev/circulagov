@@ -66,18 +66,24 @@ class TokenRecuperacaoSenha(models.Model):
         (requisito 2.5), pra não dar pista a quem tentar adivinhar ou
         reaproveitar um token de outra pessoa.
         """
+        registro, motivo = cls.buscar_com_motivo(valor_bruto)
+        return None if motivo else registro
+
+    # Igual ao validar(), mas devolve o motivo da falha, so pra log interno, nunca pode virar mensagem pro usuario.
+    @classmethod
+    def buscar_com_motivo(cls, valor_bruto):
         try:
             registro = cls.objects.get(token_hash=cls._hash(valor_bruto))
         except cls.DoesNotExist:
-            return None
+            return None, 'token_nao_encontrado'
 
         if registro.usado_em is not None:
-            return None
+            return registro, 'token_ja_usado'
 
         if timezone.now() > registro.expira_em:
-            return None
+            return registro, 'token_expirado'
 
-        return registro
+        return registro, None
 
     def marcar_usado(self):
         """Invalida o token (requisito 2.4). Chamar só depois que a
