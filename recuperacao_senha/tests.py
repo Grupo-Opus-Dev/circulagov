@@ -159,6 +159,67 @@ class TesteInvalidacaoAposUso(TestCase):
         self.assertEqual(resposta_segunda_tentativa.status_code, 400)
 
 
+class TesteLogDeSolicitacao(TestCase):
+    """Requisito 2.6: toda solicitacao de recuperacao de senha precisa gerar um registro no log."""
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password='SenhaAntiga@123'
+        )
+
+    def test_solicitar_com_usuario_existente_gera_log(self):
+        with self.assertLogs('seguranca.recuperacao_senha', level='INFO') as logs:
+            self.client.post(reverse('recuperacao_senha:solicitar'),
+                              {'username': 'usuario_teste'})
+
+        self.assertIn('usuario_teste', logs.output[0])
+
+    def test_solicitar_com_usuario_inexistente_tambem_gera_log(self):
+        with self.assertLogs('seguranca.recuperacao_senha', level='INFO') as logs:
+            self.client.post(reverse('recuperacao_senha:solicitar'),
+                              {'username': 'nao_existe'})
+
+        self.assertIn('nao_existe', logs.output[0])
+
+
+class TesteLogDeResultado(TestCase):
+    """Requisito 2.7: o log tem que dizer se a recuperacao deu certo ou nao, e o motivo, sem vazar senha ou token."""
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password='SenhaAntiga@123'
+        )
+
+    def test_redefinir_com_sucesso_gera_log_de_sucesso(self):
+        registro, valor_bruto = TokenRecuperacaoSenha.gerar(self.usuario)
+        url = reverse('recuperacao_senha:redefinir', args=[valor_bruto])
+
+        with self.assertLogs('seguranca.recuperacao_senha', level='INFO') as logs:
+            self.client.post(
+                url, {'senha_nova': 'SenhaNova@456', 'confirmacao': 'SenhaNova@456'})
+
+        self.assertIn('sucesso', logs.output[-1])
+
+    def test_redefinir_com_token_invalido_gera_log_de_falha_com_motivo(self):
+        with self.assertLogs('seguranca.recuperacao_senha', level='WARNING') as logs:
+            self.client.get(
+                reverse('recuperacao_senha:redefinir', args=['token-que-nao-existe']))
+
+        self.assertIn('token_nao_encontrado', logs.output[0])
+
+    def test_log_de_falha_nao_vaza_senha_ou_token(self):
+        registro, valor_bruto = TokenRecuperacaoSenha.gerar(self.usuario)
+        url = reverse('recuperacao_senha:redefinir', args=[valor_bruto])
+
+        with self.assertLogs('seguranca.recuperacao_senha', level='INFO') as logs:
+            self.client.post(
+                url, {'senha_nova': 'SenhaNova@456', 'confirmacao': 'OutraSenha@789'})
+
+        mensagens = ' '.join(logs.output)
+        self.assertNotIn('SenhaNova@456', mensagens)
+        self.assertNotIn(valor_bruto, mensagens)
+
+
 class TesteMensagemGenericaDeFalha(TestCase):
     """Requisito 2.5: falha clara e genérica, sem vazar qual foi o motivo."""
 

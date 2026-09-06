@@ -115,6 +115,38 @@ SESSION_COOKIE_HTTPONLY = True
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'nao-responda@circulagov.local'
 
+# Pasta dos logs de seguranca, nao versionada (ver .gitignore).
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+
+# Configuracao do log de seguranca (issues #30 e #31).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'seguranca': {
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'seguranca',
+        },
+        'arquivo_seguranca': {
+            'class': 'logging.FileHandler',
+            'filename': LOG_DIR / 'seguranca.log',
+            'formatter': 'seguranca',
+        },
+    },
+    'loggers': {
+        'seguranca': {
+            'handlers': ['console', 'arquivo_seguranca'],
+            'level': 'INFO',
+        },
+    },
+}
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
