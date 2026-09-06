@@ -70,3 +70,11 @@ token inexistente. Conteúdo gerado em `logs/seguranca.log`:
 ### 3.4 Tela de erro para token inválido/expirado/já usado
 
 [Token inválido](evidencias/08-recuperacao-token-invalido.png)
+
+### 3.5 Mensagem genérica após solicitar recuperação
+
+[Mensagem genérica](evidencias/09-recuperacao-mensagem-generica.png)
+
+Mesma mensagem aparece independentemente de o usuário existir, reforçando
+a proteção contra enumeração de contas descrita em
+`FLUXO_RECUPERACAO_SENHA.md`.
