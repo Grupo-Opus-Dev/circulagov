@@ -139,3 +139,56 @@ está em produção é uma migração complexa e arriscada no Django. Usar
 um model customizado desde o início, mesmo que hoje ele não adicione
 campos extras, garante flexibilidade para o futuro (ex: vínculo com
 município/biblioteca) sem esse risco.
+
+## 7. Token de recuperação de senha com hash e uso único
+
+**Onde:** `recuperacao_senha/models.py`, `recuperacao_senha/views.py`
+
+O token de recuperação é gerado com `secrets.token_urlsafe(32)`, e só o
+hash SHA-256 dele é salvo no banco. O token expira em 30 minutos e fica
+inválido depois do primeiro uso.
+
+**Por quê:** guardar só o hash segue a mesma lógica já aplicada à senha
+do usuário. Se o banco vazar, ninguém consegue reconstruir o token
+original a partir do hash e resetar a senha de outra pessoa.
+`secrets.token_urlsafe` usa o CSPRNG do sistema operacional, o que torna
+o token impossível de adivinhar por força bruta ou por um contador
+previsível. O prazo de 30 minutos e a invalidação após o uso reduzem a
+janela de um token roubado (de um e-mail interceptado, por exemplo) a
+uma única tentativa dentro de um tempo curto.
+
+**Por que a resposta é sempre genérica:** tanto a tela de solicitação
+quanto a de redefinição respondem da mesma forma, independente do
+motivo real (usuário não existe, token expirado, já usado ou
+inexistente). Ninguém de fora descobre, testando respostas, quais
+contas existem ou se um token específico já foi usado (enumeração de
+contas/tokens).
+
+## 8. Log de eventos de recuperação de senha
+
+**Onde:** `config/settings.py` (`LOGGING`), `recuperacao_senha/views.py`
+
+Toda solicitação de recuperação e todo resultado do processo (sucesso
+ou falha, com o motivo) são registrados em um logger dedicado,
+`seguranca.recuperacao_senha`, que grava no console e em
+`logs/seguranca.log` (arquivo local, fora do controle de versão).
+
+**Por quê:** um log de segurança só serve como registro se persistir
+depois que a janela do terminal fechar. Por isso o log vai também para
+um arquivo, além do console.
+
+**Por que o nome do logger é hierárquico
+(`seguranca.recuperacao_senha`):** a configuração de handlers fica
+centralizada no logger pai `seguranca`, em `config/settings.py`. Um
+logger futuro para outro assunto (ex: `seguranca.dois_fatores`) herda
+os mesmos handlers automaticamente, sem repetir configuração, e cada
+linha do log já mostra de qual parte do sistema veio o evento.
+
+**Por que o motivo da falha vai pro log, mas não pro usuário:** o time
+precisa do motivo real (token inexistente, expirado, já usado ou
+confirmação de senha errada) para investigar um incidente depois. Como
+esse motivo não pode aparecer na resposta ao usuário (quebraria a
+proteção contra enumeração), o model `TokenRecuperacaoSenha` expõe um
+método separado, `buscar_com_motivo`, usado só pela view para alimentar
+o log, enquanto o restante do fluxo continua usando `validar`, que
+devolve só o registro ou `None`.
