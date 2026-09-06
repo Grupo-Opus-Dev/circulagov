@@ -8,9 +8,9 @@ registro em log de cada etapa.
 
 A recuperação acontece em duas telas:
 
-1. **Solicitação** — usuário informa o nome de usuário e recebe, se a
+1. **Solicitação**: usuário informa o nome de usuário e recebe, se a
    conta existir, um e-mail com um link de redefinição.
-2. **Redefinição** — usuário acessa o link recebido e escolhe uma senha
+2. **Redefinição**: usuário acessa o link recebido e escolhe uma senha
    nova.
 
 ## Passo a passo
@@ -73,9 +73,9 @@ mostra um erro e registra a falha no log. Se conferem, a view chama
 
 A tela de solicitação sempre mostra a mesma mensagem de sucesso, e a
 tela de redefinição sempre mostra a mesma página de erro para token
-inexistente, expirado ou já usado. Isso evita enumeração de contas e de
-tokens: quem está de fora não consegue descobrir, testando respostas, se
-um usuário existe ou se um token específico já foi usado. Esse
+inexistente, expirado ou já usado. Assim, ninguém de fora consegue
+descobrir testando respostas se um usuário existe ou se um token
+específico já foi usado (enumeração de contas e de tokens). Esse
 comportamento está coberto pelos testes
 `test_solicitar_nao_revela_se_usuario_existe` e
 `test_token_expirado_usado_e_inexistente_mostram_a_mesma_pagina`, em

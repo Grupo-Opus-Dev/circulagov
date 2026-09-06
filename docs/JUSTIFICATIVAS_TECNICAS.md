@@ -149,7 +149,7 @@ hash SHA-256 dele é salvo no banco. O token expira em 30 minutos e fica
 inválido depois do primeiro uso.
 
 **Por quê:** guardar só o hash segue a mesma lógica já aplicada à senha
-do usuário — se o banco vazar, ninguém consegue reconstruir o token
+do usuário. Se o banco vazar, ninguém consegue reconstruir o token
 original a partir do hash e resetar a senha de outra pessoa.
 `secrets.token_urlsafe` usa o CSPRNG do sistema operacional, o que torna
 o token impossível de adivinhar por força bruta ou por um contador
@@ -158,11 +158,11 @@ janela de um token roubado (de um e-mail interceptado, por exemplo) a
 uma única tentativa dentro de um tempo curto.
 
 **Por que a resposta é sempre genérica:** tanto a tela de solicitação
-quanto a de redefinição respondem da mesma forma independentemente do
+quanto a de redefinição respondem da mesma forma, independente do
 motivo real (usuário não existe, token expirado, já usado ou
-inexistente). Isso evita que alguém de fora descubra, testando
-respostas, quais contas existem ou se um token específico já foi
-usado, o que caracterizaria enumeração de contas/tokens.
+inexistente). Ninguém de fora descobre, testando respostas, quais
+contas existem ou se um token específico já foi usado (enumeração de
+contas/tokens).
 
 ## 8. Log de eventos de recuperação de senha
 
@@ -175,8 +175,7 @@ ou falha, com o motivo) são registrados em um logger dedicado,
 
 **Por quê:** um log de segurança só serve como registro se persistir
 depois que a janela do terminal fechar. Por isso o log vai também para
-um arquivo, com rotação automática (`RotatingFileHandler` da biblioteca
-padrão do Python) para não crescer indefinidamente.
+um arquivo, além do console.
 
 **Por que o nome do logger é hierárquico
 (`seguranca.recuperacao_senha`):** a configuração de handlers fica

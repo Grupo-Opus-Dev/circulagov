@@ -75,6 +75,5 @@ token inexistente. Conteúdo gerado em `logs/seguranca.log`:
 
 [Mensagem genérica](evidencias/09-recuperacao-mensagem-generica.png)
 
-Mesma mensagem aparece independentemente de o usuário existir, reforçando
-a proteção contra enumeração de contas descrita em
-`FLUXO_RECUPERACAO_SENHA.md`.
+Aparece a mesma mensagem, exista ou não o usuário. Reforça a proteção
+contra enumeração de contas descrita em `FLUXO_RECUPERACAO_SENHA.md`.
