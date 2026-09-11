@@ -4,7 +4,10 @@ asgiref==3.12.1
 cffi==2.1.1
 Django==5.2.17
 django-environ==0.14.0
+django-extensions==4.1
 cryptography==50.0.1
+pyOpenSSL==26.4.0
+Werkzeug==3.1.8
 psycopg==3.3.4
 psycopg-binary==3.3.4
 pycparser==3.0
