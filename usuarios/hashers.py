@@ -11,7 +11,7 @@ class Argon2PasswordHasherCirculaGov(Argon2PasswordHasher):
 
     Justificativa: Argon2 é resistente a ataques com GPU/hardware
     especializado por exigir memória (não só tempo de CPU) para calcular
-    o hash — por isso memory_cost é o parâmetro mais importante contra
+    o hash, por isso memory_cost é o parâmetro mais importante contra
     força bruta. Os valores da OWASP equilibram essa resistência com um
     tempo de resposta de login aceitável (poucas centenas de ms), o que
     importa aqui porque o sistema roda em notebooks comuns durante o

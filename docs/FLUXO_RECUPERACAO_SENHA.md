@@ -1,4 +1,4 @@
-# Fluxo de Recuperação de Senha — CirculaGov (Requisitos 2.1 a 2.7)
+# Fluxo de Recuperação de Senha do CirculaGov (Requisitos 2.1 a 2.7)
 
 Este documento descreve, passo a passo, como funciona a recuperação de
 senha no CirculaGov, incluindo a geração do token, a troca de senha e o
