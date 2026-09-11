@@ -192,3 +192,48 @@ proteção contra enumeração), o model `TokenRecuperacaoSenha` expõe um
 método separado, `buscar_com_motivo`, usado só pela view para alimentar
 o log, enquanto o restante do fluxo continua usando `validar`, que
 devolve só o registro ou `None`.
+
+## 9. TLS/HTTPS obrigatório em produção
+
+**Onde:** `config/settings.py`
+
+Em produção (`DEBUG=False`), `SECURE_SSL_REDIRECT`,
+`SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` e `SECURE_HSTS_SECONDS`
+ficam ativados. Em desenvolvimento (`DEBUG=True`) continuam desligados,
+porque o servidor local roda em HTTP simples.
+
+**Por que usar as configurações prontas do Django, em vez de escrever
+um middleware próprio:** o Django já resolve isso de forma correta e
+testada por uma comunidade enorme há anos. Escrever um redirecionamento
+HTTP→HTTPS na mão só adicionaria uma chance de erro sem nenhum ganho
+real.
+
+**Por que `SECURE_HSTS_PRELOAD` e `SECURE_HSTS_INCLUDE_SUBDOMAINS`
+além do `SECURE_HSTS_SECONDS`:** o HSTS sozinho (`SECURE_HSTS_SECONDS`)
+só protege depois da primeira visita — a primeira requisição ainda pode
+ir por HTTP. `INCLUDE_SUBDOMAINS` estende a proteção pra qualquer
+subdomínio, e `PRELOAD` permite cadastrar o domínio numa lista mantida
+pelos navegadores, que já bloqueia HTTP mesmo na primeira visita. Como
+o projeto ainda não tem domínio de produção, essas duas flags ficam
+prontas mas o cadastro na lista de preload em si é um passo manual
+futuro, fora do escopo do código.
+
+## 10. AES-GCM para o segredo do 2FA
+
+**Onde:** `dois_fatores/cripto.py`
+
+O segredo do TOTP é cifrado com AES-GCM, usando uma chave de 256 bits
+guardada em `CHAVE_CIFRAGEM_2FA` (variável de ambiente).
+
+**Por que AES-GCM e não outro modo de AES (ex: CBC):** GCM é um modo
+*autenticado* — além de cifrar, ele gera uma tag que comprova que o
+dado não foi alterado. Se alguém adulterar um único byte do segredo
+cifrado no banco, a decifragem falha explicitamente, em vez de devolver
+um segredo TOTP corrompido silenciosamente (o que geraria códigos
+errados sem nenhum aviso de que algo está errado).
+
+**Por que um nonce novo a cada cifragem:** AES-GCM exige que o par
+(chave, nonce) nunca se repita — reusar um nonce com a mesma chave
+enfraquece a cifra seriamente. Por isso `cripto.cifrar` gera um nonce
+aleatório novo (`os.urandom`) toda vez e guarda ele junto do resultado,
+já que o nonce não precisa ser secreto, só único.
