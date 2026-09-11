@@ -1,4 +1,4 @@
-# Fluxo de Autenticação — CirculaGov (Issue 1.7)
+# Fluxo de Autenticação do CirculaGov (Issue 1.7)
 
 Este documento descreve, passo a passo, como funciona o login no
 CirculaGov, incluindo o fluxo de autenticação em dois fatores (2FA).
@@ -7,8 +7,8 @@ CirculaGov, incluindo o fluxo de autenticação em dois fatores (2FA).
 
 O login acontece em até duas etapas:
 
-1. **Senha** — sempre obrigatória.
-2. **Código de dois fatores (2FA)** — só acontece se o usuário tiver
+1. **Senha**, sempre obrigatória.
+2. **Código de dois fatores (2FA)**, só acontece se o usuário tiver
    ativado o 2FA na própria conta. Se não tiver ativado, o login
    termina na etapa 1.
 
@@ -24,7 +24,7 @@ automaticamente o usuário não autenticado para `/contas/login/`.
 
 O usuário preenche o formulário em `templates/registration/login.html`
 e envia via POST. Quem recebe essa requisição é a
-`LoginComDoisFatoresView`, em `usuarios/views.py` — uma versão
+`LoginComDoisFatoresView` (em `usuarios/views.py`), uma versão
 personalizada da tela de login padrão do Django.
 
 ### 3. Conferência da senha
@@ -84,7 +84,7 @@ usuário continue ativo.
 Um ponto importante da implementação: quando o usuário tem 2FA
 ativado, a função `login()` do Django **só é chamada depois do código
 certo**. Isso significa que, tecnicamente, ninguém está "autenticado"
-enquanto só tiver passado pela senha — mesmo que um invasor descubra a
+enquanto só tiver passado pela senha. Mesmo que um invasor descubra a
 senha de alguém, ele ainda não consegue acessar o sistema sem o
 código do 2FA. Esse comportamento está coberto pelos testes em
 `dois_fatores/tests.py` (classe `TesteLoginComDoisFatores`).
