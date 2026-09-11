@@ -113,6 +113,17 @@ SESSION_COOKIE_HTTPONLY = True
 # Fica fora do banco, numa variável de ambiente, igual a SECRET_KEY.
 CHAVE_CIFRAGEM_2FA = env('CHAVE_CIFRAGEM_2FA')
 
+# TLS/HTTPS obrigatório em produção, e bloqueio de conexão insegura
+# (requisitos 3.1/3.2). Fica atrás do DEBUG pra não travar o
+# desenvolvimento local, que roda em HTTP simples.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 # E-mail de recuperação de senha (requisito 2.1).
 # Console backend: em vez de mandar e-mail de verdade, escreve no
 # terminal onde o servidor está rodando. Serve pra desenvolvimento e
