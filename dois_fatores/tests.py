@@ -2,9 +2,40 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from . import cripto
 from .models import DispositivoTOTP
 
 Usuario = get_user_model()
+
+
+class TesteCifragemDoSegredo(TestCase):
+    """Evidência funcional de que o segredo TOTP não fica em texto puro
+    no banco, e de que a cifragem detecta adulteração."""
+
+    def test_cifrar_e_decifrar_devolve_o_valor_original(self):
+        original = b'segredo-de-teste'
+        cifrado = cripto.cifrar(original)
+        self.assertEqual(cripto.decifrar(cifrado), original)
+
+    def test_valor_cifrado_e_diferente_do_original(self):
+        original = b'segredo-de-teste'
+        cifrado = cripto.cifrar(original)
+        self.assertNotIn(original, cifrado)
+
+    def test_adulterar_o_cifrado_impede_a_decifragem(self):
+        """O AES-GCM é autenticado: qualquer byte alterado no texto
+        cifrado faz a decifragem falhar, em vez de devolver lixo."""
+        cifrado = bytearray(cripto.cifrar(b'segredo-de-teste'))
+        cifrado[-1] ^= 0xFF
+        with self.assertRaises(Exception):
+            cripto.decifrar(bytes(cifrado))
+
+    def test_dispositivo_gera_segredo_cifrado_automaticamente(self):
+        usuario = Usuario.objects.create_user(username='usuario_cripto', password='SenhaDeTeste123')
+        dispositivo = DispositivoTOTP.objects.create(usuario=usuario)
+
+        self.assertNotEqual(bytes(dispositivo.segredo_cifrado), b'')
+        self.assertNotIn(dispositivo.segredo.encode(), bytes(dispositivo.segredo_cifrado))
 
 
 class TesteCadastroDoDispositivo(TestCase):

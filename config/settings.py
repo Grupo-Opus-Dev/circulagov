@@ -108,6 +108,10 @@ TEMPO_MAXIMO_SESSAO_SEGUNDOS = 12 * 60 * 60
 
 SESSION_COOKIE_HTTPONLY = True
 
+# Chave usada pra cifrar o segredo do 2FA em repouso (requisitos 3.4/3.6).
+# Fica fora do banco, numa variável de ambiente, igual a SECRET_KEY.
+CHAVE_CIFRAGEM_2FA = env('CHAVE_CIFRAGEM_2FA')
+
 # E-mail de recuperação de senha (requisito 2.1).
 # Console backend: em vez de mandar e-mail de verdade, escreve no
 # terminal onde o servidor está rodando. Serve pra desenvolvimento e
