@@ -1,4 +1,4 @@
-# Evidências Funcionais — Autenticação (Issue 1.8)
+# Evidências Funcionais de Autenticação (Issue 1.8)
 
 Este documento reúne as evidências de que o fluxo de autenticação
 (login, 2FA e logout) do CirculaGov está funcionando corretamente.

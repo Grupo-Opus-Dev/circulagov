@@ -1,4 +1,4 @@
-# Evidências Funcionais — Recuperação de Senha (Requisitos 2.1 a 2.7)
+# Evidências Funcionais de Recuperação de Senha (Requisitos 2.1 a 2.7)
 
 Este documento reúne as evidências de que o fluxo de recuperação de
 senha do CirculaGov, incluindo o registro em log de cada etapa, está

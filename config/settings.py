@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'usuarios',
     'dois_fatores',
     'recuperacao_senha',
+    'consentimento',
 ]
 
 MIDDLEWARE = [
@@ -107,6 +108,10 @@ SESSION_COOKIE_AGE = 30 * 60
 TEMPO_MAXIMO_SESSAO_SEGUNDOS = 12 * 60 * 60
 
 SESSION_COOKIE_HTTPONLY = True
+
+# Chave usada pra cifrar o segredo do 2FA em repouso (requisitos 3.4/3.6).
+# Fica fora do banco, numa variável de ambiente, igual a SECRET_KEY.
+CHAVE_CIFRAGEM_2FA = env('CHAVE_CIFRAGEM_2FA')
 
 # TLS/HTTPS obrigatório em produção, e bloqueio de conexão insegura
 # (requisitos 3.1/3.2). Fica atrás do DEBUG pra não travar o

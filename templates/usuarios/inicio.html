@@ -1,5 +1,5 @@
 ﻿{% extends "base.html" %}
-{% block titulo %}Início — CirculaGov{% endblock %}
+{% block titulo %}Início | CirculaGov{% endblock %}
 {% block conteudo %}
 <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8 text-center">
     <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center mx-auto mb-4 font-semibold">
@@ -10,6 +10,10 @@
 
     <a href="{% url 'dois_fatores:cadastrar' %}" class="block w-full rounded-md border border-slate-300 text-slate-700 text-sm font-medium py-2.5 mb-3 hover:bg-slate-50 transition">
         Configurar autenticação de dois fatores
+    </a>
+
+    <a href="{% url 'consentimento:gerenciar' %}" class="block w-full rounded-md border border-slate-300 text-slate-700 text-sm font-medium py-2.5 mb-3 hover:bg-slate-50 transition">
+        Meus consentimentos (LGPD)
     </a>
 
     <form method="post" action="{% url 'logout' %}">
