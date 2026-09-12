@@ -29,4 +29,5 @@ urlpatterns = [
     path('dois-fatores/', include('dois_fatores.urls')),
     path('recuperar-senha/', include('recuperacao_senha.urls')),
     path('consentimento/', include('consentimento.urls')),
+    path('meus-dados/', include('direitos_titular.urls')),
 ]
