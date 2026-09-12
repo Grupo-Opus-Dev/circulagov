@@ -16,6 +16,10 @@
         Meus consentimentos (LGPD)
     </a>
 
+    <a href="{% url 'direitos_titular:consultar' %}" class="block w-full rounded-md border border-slate-300 text-slate-700 text-sm font-medium py-2.5 mb-3 hover:bg-slate-50 transition">
+        Meus dados (LGPD)
+    </a>
+
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button type="submit" class="w-full rounded-md bg-slate-900 text-white text-sm font-medium py-2.5 hover:bg-slate-800 transition">
@@ -24,3 +28,4 @@
     </form>
 </div>
 {% endblock %}
+
