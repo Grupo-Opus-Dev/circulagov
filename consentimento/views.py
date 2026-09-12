@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Consentimento, Finalidade
 
@@ -21,7 +21,8 @@ def gerenciar(request):
         ).exists()
 
         if not ja_ativo:
-            Consentimento.objects.create(usuario=request.user, finalidade=finalidade)
+            Consentimento.objects.create(
+                usuario=request.user, finalidade=finalidade)
             messages.success(request, 'Consentimento registrado.')
 
         return redirect('consentimento:gerenciar')
@@ -29,7 +30,8 @@ def gerenciar(request):
     consentimentos_ativos = Consentimento.objects.filter(
         usuario=request.user, revogado_em__isnull=True
     )
-    finalidades_aceitas = set(consentimentos_ativos.values_list('finalidade', flat=True))
+    finalidades_aceitas = set(
+        consentimentos_ativos.values_list('finalidade', flat=True))
     finalidades_pendentes = [
         (valor, rotulo) for valor, rotulo in Finalidade.choices if valor not in finalidades_aceitas
     ]
@@ -38,3 +40,17 @@ def gerenciar(request):
         'consentimentos_ativos': consentimentos_ativos,
         'finalidades_pendentes': finalidades_pendentes,
     })
+
+
+@login_required
+def revogar(request, consentimento_id):
+    """Requisito 4.6: usuário revoga um consentimento próprio."""
+    if request.method != 'POST':
+        return redirect('consentimento:gerenciar')
+
+    consentimento = get_object_or_404(
+        Consentimento, id=consentimento_id, usuario=request.user
+    )
+    consentimento.revogar()
+    messages.success(request, 'Consentimento revogado.')
+    return redirect('consentimento:gerenciar')

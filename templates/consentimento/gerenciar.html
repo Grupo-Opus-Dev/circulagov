@@ -19,11 +19,19 @@
   {% if consentimentos_ativos %}
     <ul class="mb-6 space-y-2">
       {% for c in consentimentos_ativos %}
-        <li class="rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
-          <span class="font-medium text-slate-800">{{ c.get_finalidade_display }}</span>
-          <span class="block text-xs text-slate-500">
-            aceito em {{ c.aceito_em|date:"d/m/Y H:i" }} · versão {{ c.versao_termos }}
-          </span>
+        <li class="rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm flex items-center justify-between">
+          <div>
+            <span class="font-medium text-slate-800">{{ c.get_finalidade_display }}</span>
+            <span class="block text-xs text-slate-500">
+              aceito em {{ c.aceito_em|date:"d/m/Y H:i" }} · versão {{ c.versao_termos }}
+            </span>
+          </div>
+          <form method="post" action="{% url 'consentimento:revogar' c.id %}">
+            {% csrf_token %}
+            <button type="submit" class="rounded-md bg-red-50 text-red-700 text-xs font-medium px-3 py-1.5 hover:bg-red-100 transition">
+              Revogar
+            </button>
+          </form>
         </li>
       {% endfor %}
     </ul>
