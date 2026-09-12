@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block titulo %}Meus dados — CirculaGov{% endblock %}
 {% block conteudo %}
 <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
@@ -32,6 +32,10 @@
   {% else %}
     <p class="mb-6 text-sm text-slate-500">Nenhum consentimento registrado ainda.</p>
   {% endif %}
+
+  <a href="{% url 'direitos_titular:exportar' %}" class="block w-full rounded-md border border-slate-300 text-slate-700 text-sm font-medium py-2.5 mb-3 text-center hover:bg-slate-50 transition">
+    Baixar meus dados (JSON)
+  </a>
 
   <p class="mt-6 text-sm text-center">
     <a href="{% url 'usuarios:inicio' %}" class="text-blue-700 hover:underline">Voltar</a>
