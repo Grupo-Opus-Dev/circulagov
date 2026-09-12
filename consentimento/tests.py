@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from django.urls import reverse
 
 from .models import Consentimento, Finalidade, VERSAO_TERMOS_ATUAL
@@ -48,6 +49,25 @@ class ConsentimentoModelTests(TestCase):
             Consentimento.objects.filter(
                 usuario=self.usuario, finalidade=Finalidade.CADASTRO).count(), 2
         )
+
+    def test_consentimento_registra_data_de_aceite_automaticamente(self):
+        antes = timezone.now()
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+        depois = timezone.now()
+        self.assertIsNotNone(c.aceito_em)
+        self.assertTrue(antes <= c.aceito_em <= depois)
+
+    def test_consentimento_usa_versao_atual_dos_termos_por_padrao(self):
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+        self.assertEqual(c.versao_termos, VERSAO_TERMOS_ATUAL)
+
+    def test_consentimento_pode_guardar_versao_antiga_dos_termos(self):
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO, versao_termos='0.9'
+        )
+        self.assertEqual(c.versao_termos, '0.9')
 
 
 class GerenciarConsentimentoViewTests(TestCase):
