@@ -97,3 +97,50 @@ class ExportarDadosViewTests(TestCase):
         resposta = self.client.get(reverse('direitos_titular:exportar'))
         conteudo = json.loads(resposta.content)
         self.assertEqual(len(conteudo['consentimentos']), 0)
+
+
+class ExcluirDadosViewTests(TestCase):
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password='Senha@123', email='teste@exemplo.com'
+        )
+        self.client.force_login(self.usuario)
+
+    def test_exige_login(self):
+        self.client.logout()
+        resposta = self.client.post(reverse('direitos_titular:excluir'))
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_get_nao_exclui_mostra_redireciona_para_confirmacao(self):
+        resposta = self.client.get(reverse('direitos_titular:excluir'))
+        self.assertRedirects(resposta, reverse(
+            'direitos_titular:confirmar_exclusao'))
+        self.assertTrue(Usuario.objects.filter(id=self.usuario.id).exists())
+
+    def test_post_exclui_o_usuario(self):
+        usuario_id = self.usuario.id
+        self.client.post(reverse('direitos_titular:excluir'))
+        self.assertFalse(Usuario.objects.filter(id=usuario_id).exists())
+
+    def test_excluir_apaga_aluno_vinculado(self):
+        Aluno.objects.create(usuario=self.usuario,
+                             ra='123456', nome_completo='Aluno Teste')
+        self.client.post(reverse('direitos_titular:excluir'))
+        self.assertFalse(Aluno.objects.filter(ra='123456').exists())
+
+    def test_excluir_apaga_consentimentos(self):
+        Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+        self.client.post(reverse('direitos_titular:excluir'))
+        self.assertEqual(Consentimento.objects.count(), 0)
+
+    def test_apos_excluir_usuario_e_deslogado(self):
+        self.client.post(reverse('direitos_titular:excluir'))
+        resposta = self.client.get(reverse('direitos_titular:consultar'))
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_confirmar_exclusao_exige_login(self):
+        self.client.logout()
+        resposta = self.client.get(
+            reverse('direitos_titular:confirmar_exclusao'))
+        self.assertEqual(resposta.status_code, 302)
