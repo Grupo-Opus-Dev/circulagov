@@ -1,0 +1,48 @@
+﻿{% extends "base.html" %}
+{% block titulo %}Meus dados — CirculaGov{% endblock %}
+{% block conteudo %}
+<div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
+  <h1 class="text-xl font-semibold text-slate-900 mb-1">Meus dados pessoais</h1>
+  <p class="text-sm text-slate-500 mb-6">
+    Estes são os dados pessoais que o CirculaGov guarda sobre você.
+  </p>
+
+  <h2 class="text-sm font-medium text-slate-700 mb-2">Dados cadastrais</h2>
+  <ul class="mb-6 space-y-2">
+    {% for rotulo, valor in dados_pessoais.items %}
+      <li class="rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
+        <span class="font-medium text-slate-800">{{ rotulo }}:</span>
+        <span class="text-slate-600">{{ valor }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h2 class="text-sm font-medium text-slate-700 mb-2">Consentimentos</h2>
+  {% if consentimentos %}
+    <ul class="mb-6 space-y-2">
+      {% for c in consentimentos %}
+        <li class="rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
+          <span class="font-medium text-slate-800">{{ c.get_finalidade_display }}</span>
+          <span class="block text-xs text-slate-500">
+            {% if c.ativo %}ativo{% else %}revogado{% endif %} · versão {{ c.versao_termos }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="mb-6 text-sm text-slate-500">Nenhum consentimento registrado ainda.</p>
+  {% endif %}
+
+  <a href="{% url 'direitos_titular:exportar' %}" class="block w-full rounded-md border border-slate-300 text-slate-700 text-sm font-medium py-2.5 mb-3 text-center hover:bg-slate-50 transition">
+    Baixar meus dados (JSON)
+  </a>
+
+  <a href="{% url 'direitos_titular:confirmar_exclusao' %}" class="block w-full rounded-md border border-red-200 text-red-700      text-sm font-medium py-2.5 mb-3 text-center hover:bg-red-50 transition">
+   Excluir meus dados
+  </a>
+
+  <p class="mt-6 text-sm text-center">
+    <a href="{% url 'usuarios:inicio' %}" class="text-blue-700 hover:underline">Voltar</a>
+  </p>
+</div>
+{% endblock %}

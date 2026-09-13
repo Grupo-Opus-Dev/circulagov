@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'dois_fatores',
     'recuperacao_senha',
     'consentimento',
+    'alunos',
+    'direitos_titular',
 ]
 
 MIDDLEWARE = [

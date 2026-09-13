@@ -57,9 +57,12 @@ tabela acima.
 
 ### Situação atual
 
-Hoje, nenhum desses quatro tipos existe como model separado no
-código, só o `Usuario` genérico (ver seção 2). O Aluno é o único com
-os dados já definidos para entrar em implementação nesta etapa;
+O Aluno já está implementado (model `Aluno` no app `alunos`, ligado ao
+`Usuario` genérico por um `OneToOneField`). O RA também é usado como
+`username`, então o aluno entra pela mesma tela de login de todo
+mundo, sem view nova. O e-mail institucional é obrigatório no
+cadastro, o model recusa salvar um aluno sem ele.
+
 Bibliotecário, Administrador e Escola seguem só no desenho, sem
 código ainda.
 
@@ -111,15 +114,15 @@ Nenhum dado além do necessário pra login, recuperação de senha e 2FA
   o Aluno é a exceção, com e-mail institucional obrigatório, porque
   sem contato nenhum ele não teria como recuperar a senha sozinho
   (ver seção 1).
-- **Aluno, Bibliotecário, Administrador e Escola ainda não têm model
-  no código** (ver seção 1), só o desenho dos dados de cada um. Mesmo
-  antes de existir, o desenho do Aluno já nasce mínimo: RA, nome
-  completo e e-mail institucional são os únicos dados necessários,
-  cada um com uma finalidade própria (identificação, exibição pro
-  bibliotecário e recuperação de senha). Nada de CPF, telefone,
-  endereço ou data de nascimento, mesmo sendo dados que a própria rede
-  estadual já tem sobre esse aluno. Adiar a implementação até precisar
-  de fato de cada tipo de usuário também é, em si, minimização.
+- **O model `Aluno` (app `alunos`) só guarda RA, nome completo e
+  e-mail institucional**, cada um com uma finalidade própria
+  (identificação, exibição pro bibliotecário e recuperação de senha).
+  Nada de CPF, telefone, endereço ou data de nascimento, mesmo sendo
+  dados que a própria rede estadual já tem sobre esse aluno.
+  Bibliotecário, Administrador e Escola ainda não têm model no código
+  (ver seção 1), só o desenho dos dados de cada um. Adiar a
+  implementação até precisar de fato de cada tipo de usuário também é,
+  em si, minimização.
 - **O segredo do 2FA e o token de recuperação não são "coletados"
   do usuário**, são gerados pelo próprio sistema e nunca ficam
   salvos em texto puro (segredo cifrado, token só como hash).

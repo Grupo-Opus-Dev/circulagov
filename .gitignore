@@ -223,3 +223,5 @@ __marimo__/
 # Certificado local gerado pelo runserver_plus (requisito 3.3)
 dev-cert.crt
 dev-cert.key
+
+.vscode/
