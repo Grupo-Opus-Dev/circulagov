@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_extensions',  # runserver_plus, usado só localmente pra testar HTTPS (requisito 3.3)
     'usuarios',
     'dois_fatores',
     'recuperacao_senha',
