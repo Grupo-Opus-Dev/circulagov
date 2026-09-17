@@ -168,3 +168,22 @@ class TesteLogDeAutenticacao(TestCase):
 
         mensagens = ' '.join(logs.output)
         self.assertNotIn('SenhaSecreta@999', mensagens)
+
+
+class TesteLogDeBloqueioPorForcaBruta(TestCase):
+    """Evidência funcional do requisito 5.2: o bloqueio por força bruta
+    (não só a tentativa de senha errada) também precisa gerar log."""
+
+    def test_bloqueio_apos_limite_de_tentativas_gera_log(self):
+        credenciais = {'username': 'usuario_bloqueado', 'password': 'senha_errada'}
+        for _ in range(5):
+            self.client.post(reverse('login'), credenciais)
+
+        with self.assertLogs('seguranca.autenticacao', level='WARNING') as logs:
+            self.client.post(reverse('login'), credenciais)
+
+        # A 6a tentativa também aciona um "tentativa de login com falha"
+        # (o form de bloqueio dispara a validação por baixo), então
+        # conferimos que a linha de bloqueio está em algum lugar dos logs,
+        # sem depender da posição exata.
+        self.assertIn('bloqueio por forca bruta', ' '.join(logs.output))
