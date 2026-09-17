@@ -1,0 +1,16 @@
+=== Linha 5 original (texto e assinatura) ===
+2026-09-16 07:15:00,089 INFO seguranca.recuperacao_senha recuperacao de senha concluida com sucesso, username=usuario_teste | mac=30f72cac06bfc4c89484dbc01cdbb00c3896c6282787b6d7e42ce637dac1a28f
+
+=== Linha 5 adulterada (usuario trocado, assinatura antiga mantida) ===
+2026-09-16 07:15:00,089 INFO seguranca.recuperacao_senha recuperacao de senha concluida com sucesso, username=outro_usuario | mac=30f72cac06bfc4c89484dbc01cdbb00c3896c6282787b6d7e42ce637dac1a28f
+
+=== Verificacao do log original ===
+integro=True total_linhas=13 linha_com_problema=None
+motivo=None
+ultimo_mac_valido=e99850a262a734307b373f039684aea7bf93f33c4b148ffb1af3e069530de79e
+
+=== Verificacao do log adulterado ===
+integro=False total_linhas=5 linha_com_problema=5
+motivo=assinatura não confere (linha alterada, removida ou inserida)
+ultimo_mac_valido=41cba11c3fb94bbdd587239d0ea37a987191f65a9a9b4a000836917813101743
+

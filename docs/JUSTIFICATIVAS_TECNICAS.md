@@ -237,3 +237,42 @@ errados sem nenhum aviso de que algo está errado).
 enfraquece a cifra seriamente. Por isso `cripto.cifrar` gera um nonce
 aleatório novo (`os.urandom`) toda vez e guarda ele junto do resultado,
 já que o nonce não precisa ser secreto, só único.
+
+## 11. Cadeia de HMAC para proteger o log de segurança
+
+**Onde:** `auditoria/integridade.py`, ligado em `config/settings.py`
+(`LOGGING`). Detalhes e limites em `INTEGRIDADE_LOGS.md`.
+
+Cada linha do log recebe um HMAC-SHA256 calculado sobre o próprio texto
+e sobre o HMAC da linha anterior.
+
+**Por que HMAC e não um hash simples (SHA-256 puro):** com hash sem
+chave, quem consegue editar o arquivo também consegue recalcular todos
+os hashes depois da alteração, e a cadeia volta a parecer válida. O HMAC
+depende de uma chave secreta que não está no servidor de arquivos nem no
+código, então quem altera o log não consegue gerar assinaturas válidas.
+
+**Por que encadear, em vez de assinar cada linha sozinha:** com
+assinatura independente por linha, apagar uma linha inteira (texto e
+assinatura juntos) não deixaria rastro, porque todas as outras continuam
+válidas. No encadeamento, cada assinatura depende da anterior, então
+remover ou reordenar linhas quebra a verificação.
+
+**Por que um handler, e não mudar cada `logger.info()`:** o handler
+fica no logger pai `seguranca`. Todo evento de segurança, inclusive os
+que outros integrantes forem criando, passa por ele automaticamente.
+Proteger evento por evento dependeria de ninguém esquecer.
+
+**Por que usar `hmac` e `hashlib` da biblioteca padrão:** são
+implementações mantidas e revisadas junto com o próprio Python. O
+projeto só monta a cadeia, sem implementar nenhuma primitiva
+criptográfica por conta própria. A comparação usa `hmac.compare_digest`,
+que leva o mesmo tempo independente de onde os valores diferem, pra não
+dar pista sobre a assinatura correta.
+
+**Por que uma chave separada da `CHAVE_CIFRAGEM_2FA`:** cada chave com
+uma única finalidade. Se uma vazar, a outra proteção continua valendo.
+
+**Por que a tela de verificação é só para administradores:** o
+resultado mostra em qual linha o log foi alterado, informação que
+ajudaria um invasor a testar se conseguiu esconder rastros.

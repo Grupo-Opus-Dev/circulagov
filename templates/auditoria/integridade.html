@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}Integridade do log | CirculaGov{% endblock %}
+{% block conteudo %}
+<div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
+  <h1 class="text-xl font-semibold text-slate-900 mb-1">Integridade do log de segurança</h1>
+  <p class="text-sm text-slate-500 mb-6">
+    Cada linha do log é assinada e encadeada com a anterior. Qualquer alteração quebra a cadeia.
+  </p>
+
+  {% if resultado.integro %}
+    <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+      Log íntegro: {{ resultado.total_linhas }} linha{{ resultado.total_linhas|pluralize }} verificada{{ resultado.total_linhas|pluralize }}.
+    </div>
+  {% else %}
+    <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <p class="font-medium">Log alterado na linha {{ resultado.linha_com_problema }}.</p>
+      <p>{{ resultado.motivo }}</p>
+    </div>
+  {% endif %}
+
+  <p class="text-xs text-slate-500 break-all">
+    Último MAC válido da cadeia: <code>{{ resultado.ultimo_mac }}</code>
+  </p>
+
+  <p class="mt-6 text-sm text-center">
+    <a href="{% url 'usuarios:inicio' %}" class="text-blue-700 hover:underline">Voltar</a>
+  </p>
+</div>
+{% endblock %}
