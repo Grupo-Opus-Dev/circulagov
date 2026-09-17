@@ -120,3 +120,51 @@ class TesteTimeoutDeSessao(TestCase):
         resposta = self.client.get(reverse('usuarios:inicio'))
 
         self.assertEqual(resposta.status_code, 200)
+
+
+class TesteLogDeAutenticacao(TestCase):
+    """Evidência funcional do requisito 5.1: login, logout e tentativa de
+    login com falha precisam gerar log."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_log', password=self.senha
+        )
+
+    def test_login_com_sucesso_gera_log(self):
+        with self.assertLogs('seguranca.autenticacao', level='INFO') as logs:
+            self.client.post(
+                reverse('login'), {'username': 'usuario_log', 'password': self.senha}
+            )
+
+        self.assertIn('login com sucesso', logs.output[0])
+        self.assertIn('usuario_log', logs.output[0])
+
+    def test_logout_gera_log(self):
+        self.client.login(username='usuario_log', password=self.senha)
+
+        with self.assertLogs('seguranca.autenticacao', level='INFO') as logs:
+            self.client.post(reverse('logout'))
+
+        self.assertIn('logout', logs.output[0])
+        self.assertIn('usuario_log', logs.output[0])
+
+    def test_login_com_senha_errada_gera_log_de_falha(self):
+        with self.assertLogs('seguranca.autenticacao', level='WARNING') as logs:
+            self.client.post(
+                reverse('login'), {'username': 'usuario_log', 'password': 'senha_errada'}
+            )
+
+        self.assertIn('tentativa de login com falha', logs.output[0])
+        self.assertIn('usuario_log', logs.output[0])
+
+    def test_log_de_falha_nao_vaza_senha(self):
+        with self.assertLogs('seguranca.autenticacao', level='WARNING') as logs:
+            self.client.post(
+                reverse('login'),
+                {'username': 'usuario_log', 'password': 'SenhaSecreta@999'},
+            )
+
+        mensagens = ' '.join(logs.output)
+        self.assertNotIn('SenhaSecreta@999', mensagens)
