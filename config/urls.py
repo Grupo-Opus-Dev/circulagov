@@ -30,4 +30,5 @@ urlpatterns = [
     path('recuperar-senha/', include('recuperacao_senha.urls')),
     path('consentimento/', include('consentimento.urls')),
     path('meus-dados/', include('direitos_titular.urls')),
+    path('auditoria/', include('auditoria.urls')),
 ]

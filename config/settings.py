@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'consentimento',
     'alunos',
     'direitos_titular',
+    'auditoria',
 ]
 
 MIDDLEWARE = [
@@ -138,6 +139,10 @@ DEFAULT_FROM_EMAIL = 'nao-responda@circulagov.local'
 LOG_DIR = BASE_DIR / 'logs'
 LOG_DIR.mkdir(exist_ok=True)
 
+# Chave do HMAC que protege o log contra alteracao (requisito 5.3).
+# Separada da CHAVE_CIFRAGEM_2FA: cada chave com uma unica finalidade.
+CHAVE_INTEGRIDADE_LOGS = env('CHAVE_INTEGRIDADE_LOGS')
+
 # Configuracao do log de seguranca (issues #30 e #31).
 LOGGING = {
     'version': 1,
@@ -152,10 +157,13 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'seguranca',
         },
+        # Assina e encadeia cada linha (ver auditoria/integridade.py).
+        # Todo logger filho de "seguranca" passa por aqui automaticamente.
         'arquivo_seguranca': {
-            'class': 'logging.FileHandler',
+            'class': 'auditoria.integridade.HandlerLogIntegro',
             'filename': LOG_DIR / 'seguranca.log',
             'formatter': 'seguranca',
+            'chave': CHAVE_INTEGRIDADE_LOGS,
         },
     },
     'loggers': {
