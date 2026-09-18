@@ -1,8 +1,12 @@
+import logging
+
 import pyotp
 from django.conf import settings
 from django.db import models
 
 from . import cripto
+
+logger = logging.getLogger('seguranca.dois_fatores')
 
 
 class DispositivoTOTP(models.Model):
@@ -41,5 +45,15 @@ class DispositivoTOTP(models.Model):
         return pyotp.TOTP(self.segredo)
 
     def verificar_codigo(self, codigo):
+        # Requisito 5.2. Fica aqui, e não em cada view, porque tanto o
+        # cadastro do 2FA quanto o login passam por esse método, então um
+        # log só nesse lugar já cobre os dois casos sem repetir código.
+        # O código digitado nunca entra na mensagem, só o resultado.
         gerador = self.totp()
-        return gerador.verify(codigo, valid_window=1)
+        codigo_certo = gerador.verify(codigo, valid_window=1)
+        username = self.usuario.get_username()
+        if codigo_certo:
+            logger.info('codigo 2FA correto, username=%s', username)
+        else:
+            logger.warning('codigo 2FA incorreto, username=%s', username)
+        return codigo_certo

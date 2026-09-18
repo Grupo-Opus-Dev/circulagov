@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
@@ -8,6 +10,8 @@ from .models import DispositivoTOTP
 Usuario = get_user_model()
 
 CHAVE_USUARIO_PENDENTE = 'usuario_pendente_id'
+
+logger = logging.getLogger('seguranca.dois_fatores')
 
 
 @login_required
@@ -21,6 +25,10 @@ def cadastrar(request):
         if dispositivo.verificar_codigo(codigo):
             dispositivo.confirmado = True
             dispositivo.save()
+            # Requisito 5.2: evento separado do "código correto" (que já é
+            # logado dentro de verificar_codigo), porque ativar o 2FA é uma
+            # mudança de configuração da conta, não só uma checagem de código.
+            logger.info('2FA ativado, username=%s', request.user.get_username())
             messages.success(request, 'Autenticação de dois fatores ativada.')
             return redirect('usuarios:inicio')
         messages.error(request, 'Código inválido. Confira o relógio do app autenticador.')

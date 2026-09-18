@@ -1,0 +1,33 @@
+Evidência das issues 5.1 e 5.2, capturada usando o sistema pela tela
+(login, logout, ativação de 2FA e código de verificação), com o
+usuário demo_logs. Log real, gerado pelo HandlerLogIntegro (por isso
+cada linha termina com "| mac=...").
+
+=== 5.1: login com falha, login com sucesso, logout ===
+2026-09-17 19:49:34,192 WARNING seguranca.autenticacao tentativa de login com falha, username=demo_logs | mac=8b33edee6d3584ccc1189c714676eb619eb67074cd1bbc640173818369073437
+2026-09-17 19:49:52,065 INFO seguranca.autenticacao login com sucesso, username=demo_logs | mac=3f67a17a120dae0f57ed77a8d1cccdc78ce78ca9908a2198c7d43968d0d26192
+2026-09-17 19:51:58,720 INFO seguranca.autenticacao logout, username=demo_logs | mac=a30106531f34165b38478a73b8865130c72f61f87a527a669d8e19df6ca3db77
+
+=== 5.2: ativação do 2FA, código correto e incorreto ===
+2026-09-17 19:51:06,986 WARNING seguranca.dois_fatores codigo 2FA incorreto, username=demo_logs | mac=e30fa6841c391a049dbc75259bfe280690b02fdf28328065410602882d91f6f6
+2026-09-17 19:51:38,451 INFO seguranca.dois_fatores codigo 2FA correto, username=demo_logs | mac=eae08141dc1721589b6acddd52c10137aa43df0be09ad9d5b5ff0edb4cb3b154
+2026-09-17 19:51:38,474 INFO seguranca.dois_fatores 2FA ativado, username=demo_logs | mac=15972090f6c23000db0745059269f31b0149bab7f3fadb776792d0644d0f6914
+
+=== 5.2: mesmo par código correto/incorreto, agora na tela de login (verificação) ===
+2026-09-17 19:52:31,840 WARNING seguranca.dois_fatores codigo 2FA incorreto, username=demo_logs | mac=7d153a2e9d208d2db06177577c88c6cfc8944a87722b7878d057dfc65966f766
+2026-09-17 19:52:50,612 INFO seguranca.dois_fatores codigo 2FA correto, username=demo_logs | mac=4263c3ae484b3237ad20013effd103907a8162cab75a2232d406ce5d5cdd9a9d
+2026-09-17 19:52:51,026 INFO seguranca.autenticacao login com sucesso, username=demo_logs | mac=eb8752bcc50f50a8f8851ef882ff102cd7f96e594496deb457256515d23dff7d
+
+=== 5.2: bloqueio por força bruta, usuário usuario_forca_bruta, 5 senhas erradas seguidas ===
+2026-09-17 19:53:12,826 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_forca_bruta | mac=58f228285ee897b188cec4746ae268c41340c9cb1fe920477f105400c2c7ebf0
+2026-09-17 19:53:27,603 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_forca_bruta | mac=112c94e2b7b50b92a8ef62f481ed14a59f0b10e57c3e1bca097adf95d30e1efb
+2026-09-17 19:53:35,219 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_forca_bruta | mac=fa89a28b39acea2cfafabcadc23ae6731be9fbbe55de5b6938ec0ba49a0b526e
+2026-09-17 19:53:42,982 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_forca_bruta | mac=3cd695e3e3d7d0f892608ce68d6773c6d18e48c0f69f4d4c802531e55e8f6b48
+2026-09-17 19:53:54,706 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_forca_bruta | mac=ccee3ceabec883df8352038a449159fdabf09b6d22ac43573a001642648122e3
+2026-09-17 19:53:59,748 WARNING seguranca.autenticacao bloqueio por forca bruta, username=usuario_forca_bruta | mac=d5870e6aeb370c0e6ef156da78ef7f4db3bfb517e56a8b1f6c62ba613f91ed81
+
+A linha seguinte ao bloqueio ("tentativa de login com falha" de novo,
+na 6a tentativa) é esperada: o próprio formulário de bloqueio já
+existente no projeto reaproveita a validação padrão do Django por
+baixo, que dispara um user_login_failed extra. O evento de bloqueio em
+si já fica registrado antes disso, na linha acima.

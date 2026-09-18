@@ -120,3 +120,70 @@ class TesteTimeoutDeSessao(TestCase):
         resposta = self.client.get(reverse('usuarios:inicio'))
 
         self.assertEqual(resposta.status_code, 200)
+
+
+class TesteLogDeAutenticacao(TestCase):
+    """Evidência funcional do requisito 5.1: login, logout e tentativa de
+    login com falha precisam gerar log."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_log', password=self.senha
+        )
+
+    def test_login_com_sucesso_gera_log(self):
+        with self.assertLogs('seguranca.autenticacao', level='INFO') as logs:
+            self.client.post(
+                reverse('login'), {'username': 'usuario_log', 'password': self.senha}
+            )
+
+        self.assertIn('login com sucesso', logs.output[0])
+        self.assertIn('usuario_log', logs.output[0])
+
+    def test_logout_gera_log(self):
+        self.client.login(username='usuario_log', password=self.senha)
+
+        with self.assertLogs('seguranca.autenticacao', level='INFO') as logs:
+            self.client.post(reverse('logout'))
+
+        self.assertIn('logout', logs.output[0])
+        self.assertIn('usuario_log', logs.output[0])
+
+    def test_login_com_senha_errada_gera_log_de_falha(self):
+        with self.assertLogs('seguranca.autenticacao', level='WARNING') as logs:
+            self.client.post(
+                reverse('login'), {'username': 'usuario_log', 'password': 'senha_errada'}
+            )
+
+        self.assertIn('tentativa de login com falha', logs.output[0])
+        self.assertIn('usuario_log', logs.output[0])
+
+    def test_log_de_falha_nao_vaza_senha(self):
+        with self.assertLogs('seguranca.autenticacao', level='WARNING') as logs:
+            self.client.post(
+                reverse('login'),
+                {'username': 'usuario_log', 'password': 'SenhaSecreta@999'},
+            )
+
+        mensagens = ' '.join(logs.output)
+        self.assertNotIn('SenhaSecreta@999', mensagens)
+
+
+class TesteLogDeBloqueioPorForcaBruta(TestCase):
+    """Evidência funcional do requisito 5.2: o bloqueio por força bruta
+    (não só a tentativa de senha errada) também precisa gerar log."""
+
+    def test_bloqueio_apos_limite_de_tentativas_gera_log(self):
+        credenciais = {'username': 'usuario_bloqueado', 'password': 'senha_errada'}
+        for _ in range(5):
+            self.client.post(reverse('login'), credenciais)
+
+        with self.assertLogs('seguranca.autenticacao', level='WARNING') as logs:
+            self.client.post(reverse('login'), credenciais)
+
+        # A 6a tentativa também aciona um "tentativa de login com falha"
+        # (o form de bloqueio dispara a validação por baixo), então
+        # conferimos que a linha de bloqueio está em algum lugar dos logs,
+        # sem depender da posição exata.
+        self.assertIn('bloqueio por forca bruta', ' '.join(logs.output))

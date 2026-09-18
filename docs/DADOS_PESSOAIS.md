@@ -98,6 +98,18 @@ fica cifrado em repouso (ver `JUSTIFICATIVAS_TECNICAS.md`).
 Também não é dado pessoal: só o hash do token fica salvo, o valor
 original nunca chega ao banco.
 
+### Log de segurança (`logs/seguranca.log`)
+
+| Campo | Finalidade |
+|---|---|
+| `username` | Identificar de qual conta foi o evento de login, logout, 2FA ou recuperação de senha, pra investigar um incidente depois |
+
+Único dado pessoal gravado no log. Pro Aluno, esse `username` é o RA
+(ver seção 1). Nenhum outro dado da pessoa entra em nenhuma linha, e
+senha, código do 2FA, segredo do TOTP e token de recuperação nunca são
+gravados. Detalhes de cada evento, exemplo de linha e por que cada
+campo existe em `LOGS_AUTENTICACAO.md`.
+
 ## 3. Evidência de minimização de dados
 
 Nenhum dado além do necessário pra login, recuperação de senha e 2FA
@@ -126,3 +138,6 @@ Nenhum dado além do necessário pra login, recuperação de senha e 2FA
 - **O segredo do 2FA e o token de recuperação não são "coletados"
   do usuário**, são gerados pelo próprio sistema e nunca ficam
   salvos em texto puro (segredo cifrado, token só como hash).
+- **O log de segurança só grava o `username`** de quem gerou o evento
+  (login, logout, 2FA, recuperação de senha), nunca senha, código,
+  segredo ou token (ver seção 2).
