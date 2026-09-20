@@ -1,3 +1,4 @@
+import logging
 import time
 
 from django.contrib.auth.decorators import login_required
@@ -7,6 +8,8 @@ from django.shortcuts import redirect, render
 from dois_fatores.models import DispositivoTOTP
 from dois_fatores.views import CHAVE_USUARIO_PENDENTE
 from .seguranca import calcular_atraso, limpar_tentativas, registrar_falha, usuario_bloqueado
+
+logger = logging.getLogger('seguranca.autenticacao')
 
 
 class LoginComDoisFatoresView(LoginView):
@@ -21,6 +24,9 @@ class LoginComDoisFatoresView(LoginView):
         nome_usuario = request.POST.get('username', '')
 
         if nome_usuario and usuario_bloqueado(nome_usuario):
+            # Requisito 5.2: esse bloqueio acontece antes mesmo de tentar
+            # autenticar, então é um evento diferente da falha de login comum.
+            logger.warning('bloqueio por forca bruta, username=%s', nome_usuario)
             formulario = self.get_form()
             formulario.add_error(
                 None,

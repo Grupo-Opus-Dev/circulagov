@@ -143,3 +143,60 @@ class TesteLoginComDoisFatores(TestCase):
 
         resposta = self.client.get(reverse('usuarios:inicio'))
         self.assertEqual(resposta.status_code, 200)
+
+
+class TesteLogDeEventosDoisFatores(TestCase):
+    """Evidência funcional do requisito 5.2: ativação do 2FA, código certo
+    e código errado precisam gerar log, tanto no cadastro quanto no login."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_log_2fa', password=self.senha
+        )
+        self.client.login(username='usuario_log_2fa', password=self.senha)
+
+    def test_ativar_2fa_com_codigo_certo_gera_log_de_codigo_correto_e_de_ativacao(self):
+        dispositivo = DispositivoTOTP.objects.create(usuario=self.usuario)
+        codigo = dispositivo.totp().now()
+
+        with self.assertLogs('seguranca.dois_fatores', level='INFO') as logs:
+            self.client.post(reverse('dois_fatores:cadastrar'), {'codigo': codigo})
+
+        mensagens = ' '.join(logs.output)
+        self.assertIn('codigo 2FA correto', mensagens)
+        self.assertIn('2FA ativado', mensagens)
+
+    def test_cadastrar_com_codigo_errado_gera_log_de_codigo_incorreto(self):
+        DispositivoTOTP.objects.create(usuario=self.usuario)
+
+        with self.assertLogs('seguranca.dois_fatores', level='WARNING') as logs:
+            self.client.post(reverse('dois_fatores:cadastrar'), {'codigo': '000000'})
+
+        self.assertIn('codigo 2FA incorreto', logs.output[0])
+
+    def test_verificar_no_login_com_codigo_certo_gera_log(self):
+        dispositivo = DispositivoTOTP.objects.create(usuario=self.usuario, confirmado=True)
+        self.client.post(reverse('logout'))
+        self.client.post(
+            reverse('login'), {'username': 'usuario_log_2fa', 'password': self.senha}
+        )
+
+        with self.assertLogs('seguranca.dois_fatores', level='INFO') as logs:
+            self.client.post(
+                reverse('dois_fatores:verificar'), {'codigo': dispositivo.totp().now()}
+            )
+
+        self.assertIn('codigo 2FA correto', logs.output[0])
+
+    def test_verificar_no_login_com_codigo_errado_gera_log(self):
+        DispositivoTOTP.objects.create(usuario=self.usuario, confirmado=True)
+        self.client.post(reverse('logout'))
+        self.client.post(
+            reverse('login'), {'username': 'usuario_log_2fa', 'password': self.senha}
+        )
+
+        with self.assertLogs('seguranca.dois_fatores', level='WARNING') as logs:
+            self.client.post(reverse('dois_fatores:verificar'), {'codigo': '000000'})
+
+        self.assertIn('codigo 2FA incorreto', logs.output[0])
