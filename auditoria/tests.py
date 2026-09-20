@@ -21,7 +21,8 @@ OUTRA_CHAVE = base64.b64encode(b'x' * 32).decode()
 def gravar_eventos(caminho, mensagens, chave=CHAVE_TESTE):
     """Grava mensagens usando o handler real, como a aplicação faz."""
     handler = HandlerLogIntegro(caminho, chave)
-    handler.setFormatter(logging.Formatter('%(levelname)s %(name)s %(message)s'))
+    handler.setFormatter(logging.Formatter(
+        '%(levelname)s %(name)s %(message)s'))
     logger = logging.getLogger(f'teste.integridade.{id(handler)}')
     logger.propagate = False
     logger.addHandler(handler)
@@ -75,7 +76,8 @@ class CadeiaDeIntegridadeTests(SimpleTestCase):
     def test_inserir_linha_forjada_sem_a_chave_e_detectado(self):
         gravar_eventos(self.caminho, ['evento 1', 'evento 2'])
         linhas = self.linhas()
-        linhas.insert(1, 'INFO seguranca login ok username=invasor | mac=' + 'a' * 64)
+        linhas.insert(
+            1, 'INFO seguranca login ok username=invasor | mac=' + 'a' * 64)
         self.reescrever(linhas)
 
         resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
@@ -98,7 +100,8 @@ class CadeiaDeIntegridadeTests(SimpleTestCase):
 
     def test_quebra_de_linha_na_mensagem_nao_forja_linha_nova(self):
         # Simula um username malicioso tentando criar uma linha falsa.
-        gravar_eventos(self.caminho, ['login falhou username=x\nINFO seguranca login ok'])
+        gravar_eventos(
+            self.caminho, ['login falhou username=x\nINFO seguranca login ok'])
         self.assertEqual(len(self.linhas()), 1)
         self.assertTrue(verificar_arquivo(self.caminho, CHAVE_TESTE).integro)
 
@@ -135,7 +138,8 @@ class TelaEComandoDeIntegridadeTests(TestCase):
         self.caminho.write_text('\n'.join(linhas) + '\n', encoding='utf-8')
 
     def test_tela_exige_administrador(self):
-        comum = Usuario.objects.create_user(username='comum', password='Senha@12345')
+        comum = Usuario.objects.create_user(
+            username='comum', password='Senha@12345')
         self.client.force_login(comum)
         resposta = self.client.get(reverse('auditoria:integridade'))
         self.assertEqual(resposta.status_code, 302)
@@ -170,3 +174,73 @@ class TelaEComandoDeIntegridadeTests(TestCase):
         self.adulterar()
         with self.assertRaises(CommandError):
             call_command('verificar_logs', stdout=StringIO())
+
+
+class AnalisarLogsCommandTests(TestCase):
+    def setUp(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.caminho = Path(self.pasta.name) / 'seguranca.log'
+        self.override = override_settings(LOG_DIR=Path(self.pasta.name))
+        self.override.enable()
+
+    def tearDown(self):
+        self.override.disable()
+        self.pasta.cleanup()
+
+    def escrever_log(self, linhas):
+        self.caminho.write_text('\n'.join(linhas) + '\n', encoding='utf-8')
+
+    def test_conta_falhas_de_login_por_usuario(self):
+        self.escrever_log([
+            '2026-01-01 10:00:00,000 WARNING seguranca.autenticacao tentativa de login com falha, username=ana',
+            '2026-01-01 10:00:01,000 WARNING seguranca.autenticacao tentativa de login com falha, username=ana',
+            '2026-01-01 10:00:02,000 WARNING seguranca.autenticacao tentativa de login com falha, username=bruno',
+        ])
+        saida = StringIO()
+        call_command('analisar_logs', stdout=saida)
+        resultado = saida.getvalue()
+        self.assertIn('ana: 2 tentativa(s)', resultado)
+        self.assertIn('bruno: 1 tentativa(s)', resultado)
+
+    def test_detecta_bloqueio_por_forca_bruta(self):
+        self.escrever_log([
+            '2026-01-01 10:00:00,000 WARNING seguranca.autenticacao bloqueio por forca bruta, username=ana',
+        ])
+        saida = StringIO()
+        call_command('analisar_logs', stdout=saida)
+        self.assertIn('ana: 1 bloqueio(s)', saida.getvalue())
+
+    def test_conta_eventos_de_2fa(self):
+        self.escrever_log([
+            '2026-01-01 10:00:00,000 INFO seguranca.dois_fatores 2FA ativado, username=ana',
+            '2026-01-01 10:00:01,000 INFO seguranca.dois_fatores codigo 2FA correto, username=ana',
+            '2026-01-01 10:00:02,000 WARNING seguranca.dois_fatores codigo 2FA incorreto, username=ana',
+        ])
+        saida = StringIO()
+        call_command('analisar_logs', stdout=saida)
+        resultado = saida.getvalue()
+        self.assertIn('1 ativação(ões)', resultado)
+        self.assertIn('1 código(s) correto(s)', resultado)
+        self.assertIn('1 código(s) incorreto(s)', resultado)
+
+    def test_ignora_linhas_de_outros_loggers(self):
+        self.escrever_log([
+            '2026-01-01 10:00:00,000 INFO seguranca.recuperacao_senha solicitacao de recuperacao de senha para username=ana',
+        ])
+        saida = StringIO()
+        call_command('analisar_logs', stdout=saida)
+        resultado = saida.getvalue()
+        self.assertIn('Nenhuma falha registrada', resultado)
+        self.assertIn('Nenhum evento de 2FA registrado', resultado)
+
+    def test_reconhece_linhas_com_assinatura_mac(self):
+        self.escrever_log([
+            '2026-01-01 10:00:00,000 WARNING seguranca.autenticacao tentativa de login com falha, username=ana | mac=' + 'a' * 64,
+        ])
+        saida = StringIO()
+        call_command('analisar_logs', stdout=saida)
+        self.assertIn('ana: 1 tentativa(s)', saida.getvalue())
+
+    def test_arquivo_de_log_inexistente_gera_erro_claro(self):
+        with self.assertRaises(CommandError):
+            call_command('analisar_logs', stdout=StringIO())

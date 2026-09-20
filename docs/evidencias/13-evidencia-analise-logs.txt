@@ -1,0 +1,19 @@
+﻿Evidência da issue 5.4, capturada rodando o comando de análise sobre
+o log de segurança real (logs/seguranca.log), acumulado após rodar a
+suíte de testes automatizados e testes manuais pela tela (incluindo um
+bloqueio real por força bruta, usuário "vitor", 6 tentativas de senha
+errada seguidas).
+
+=== Saída real do comando "python manage.py analisar_logs" ===
+
+=== Tentativas de login com falha, por usuário ===
+  usuario_bloqueado: 15 tentativa(s)
+  vitor: 6 tentativa(s)
+  vitot: 1 tentativa(s)
+
+=== Bloqueios por força bruta ===
+  vitor: 1 bloqueio(s)
+
+=== Eventos de 2FA, por usuário ===
+  usuario_teste: 3 ativação(ões), 3 código(s) correto(s), 3 código(s) incorreto(s)
+  usuario_com_2fa: 0 ativação(ões), 6 código(s) correto(s), 3 código(s) incorreto(s)
