@@ -19,7 +19,7 @@ que não está.
 | Everson Duarte de Souza | [@everson-duarte](https://github.com/everson-duarte) |
 | Emanuel Victor | [@Manuzel](https://github.com/Manuzel) |
 | Vitor Dias Santana | [@vitin2505](https://github.com/vitin2505) |
-| Wendyl Maycon | [@wendylmaycon](https://github.com/wendylmaycon) |
+| Maycon Wendyl | [@wendylmaycon](https://github.com/wendylmaycon) |
 
 ## 2. O problema
 
