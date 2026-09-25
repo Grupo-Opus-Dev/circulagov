@@ -99,3 +99,47 @@ log de segurança pra esconder um incidente.
 python manage.py test
 ```
 
+## Resultados da execução
+
+Execução real em **24/09/2026**, com **Python 3.13.15** e **Django
+5.2.17**.
+
+### `python manage.py test`
+
+```
+Ran 109 tests in 10.667s
+
+OK
+```
+
+Saída completa, sem cortes, em
+[`evidencias/14-evidencia-saida-python-manage-test.txt`](evidencias/14-evidencia-saida-python-manage-test.txt).
+As linhas com data e hora misturadas aos pontos dos testes não são
+erro de formatação: são os próprios eventos de segurança sendo
+gravados de verdade enquanto os testes que os disparam rodam.
+
+### `python manage.py verificar_logs`
+
+Com o log íntegro (3 eventos reais gerados pela tela: login errado,
+login certo e logout):
+
+```
+Log íntegro: 3 linhas verificadas.
+Último MAC da cadeia: 506414722c93054166fba2c59563b9b060f1f8b376d82f10ff03ee66b83f1c64
+```
+
+Depois de adulterar de propósito a linha 2 (trocando "sucesso" por
+"SUCESSO", mantendo a assinatura antiga):
+
+```
+CommandError: Log ALTERADO na linha 2: assinatura não confere (linha alterada, removida ou inserida)
+```
+
+A detecção aponta exatamente a linha alterada. Evidência completa,
+com as três linhas originais e as adulteradas, em
+[`evidencias/15-evidencia-verificar-logs.txt`](evidencias/15-evidencia-verificar-logs.txt).
+
+Pra reproduzir: gerar alguns eventos de login pela tela, rodar
+`python manage.py verificar_logs` (deve aprovar), editar manualmente
+uma palavra de qualquer linha de `logs/seguranca.log` e rodar o
+comando de novo (deve apontar a linha alterada).
