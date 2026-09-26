@@ -8,14 +8,23 @@ recomendação.
 Todas as fontes abaixo foram abertas e lidas no trecho citado. A seção 10 traz
 um roteiro de leitura para conferir as passagens antes da apresentação.
 
-A normalização das referências em ABNT NBR 6023 é feita na issue 6.12.
+**Normalização (issue 6.12).** As referências seguem a ABNT NBR 6023:2018. Os
+prenomes são abreviados de forma uniforme em toda a lista, como a norma
+permite. Meses vêm abreviados, exceto maio. Para leis, a ementa é obrigatória.
+Endereços eletrônicos vão sem os sinais `< >`, que a versão de 2018 dispensou.
+A lista consolidada, em ordem alfabética, está na seção 11.
+
+O guia prático consultado para os exemplos de formatação foi o da Biblioteca
+Universitária da UFSC, também listado na seção 11. A norma em si não foi
+acessada, por ser de assinatura paga.
 
 ---
 
 ## 1. Hash de senha: parâmetros do Argon2id
 
-**Fonte:** OWASP. *Password Storage Cheat Sheet*. OWASP Cheat Sheet Series.
-Disponível em: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+**Fonte:** OWASP. **Password storage cheat sheet**. OWASP Cheat Sheet Series,
+[s. l.], [s. d.]. Disponível em:
+https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html.
 Acesso em: 24 set. 2026.
 
 **O que diz, textualmente:**
@@ -44,11 +53,10 @@ Os três valores do código correspondem exatamente aos da recomendação:
 
 ## 2. Hash de senha: a especificação do algoritmo
 
-**Fonte:** BIRYUKOV, A.; DINU, D.; KHOVRATOVICH, D.; JOSEFSSON, S. *Argon2
-Memory-Hard Function for Password Hashing and Proof-of-Work Applications*.
-RFC 9106. IETF, set. 2021. Categoria: Informational.
-Disponível em: https://www.rfc-editor.org/rfc/rfc9106.txt
-Acesso em: 24 set. 2026.
+**Fonte:** BIRYUKOV, A.; DINU, D.; KHOVRATOVICH, D.; JOSEFSSON, S. **Argon2
+memory-hard function for password hashing and proof-of-work applications**.
+[S. l.]: IETF, set. 2021. (RFC 9106). Disponível em:
+https://www.rfc-editor.org/rfc/rfc9106.txt. Acesso em: 24 set. 2026.
 
 **O que diz, textualmente,** sobre qual variante escolher:
 
@@ -76,11 +84,9 @@ produção, o valor deveria subir.
 
 ## 3. Segundo fator: o algoritmo TOTP
 
-**Fonte:** M'RAIHI, D.; MACHANI, S.; PEI, M.; RYDELL, J. *TOTP: Time-Based
-One-Time Password Algorithm*. RFC 6238. IETF, maio 2011. Categoria:
-Informational.
-Disponível em: https://www.rfc-editor.org/rfc/rfc6238.txt
-Acesso em: 24 set. 2026.
+**Fonte:** M'RAIHI, D.; MACHANI, S.; PEI, M.; RYDELL, J. **TOTP**: time-based
+one-time password algorithm. [S. l.]: IETF, maio 2011. (RFC 6238). Disponível
+em: https://www.rfc-editor.org/rfc/rfc6238.txt. Acesso em: 24 set. 2026.
 
 **O que diz, textualmente:**
 
@@ -102,10 +108,9 @@ RFC.
 
 ## 4. Integridade do log: o que é HMAC
 
-**Fonte:** KRAWCZYK, H.; BELLARE, M.; CANETTI, R. *HMAC: Keyed-Hashing for
-Message Authentication*. RFC 2104. IETF, fev. 1997.
-Disponível em: https://www.rfc-editor.org/rfc/rfc2104.txt
-Acesso em: 24 set. 2026.
+**Fonte:** KRAWCZYK, H.; BELLARE, M.; CANETTI, R. **HMAC**: keyed-hashing for
+message authentication. [S. l.]: IETF, fev. 1997. (RFC 2104). Disponível em:
+https://www.rfc-editor.org/rfc/rfc2104.txt. Acesso em: 24 set. 2026.
 
 **O que diz, textualmente:**
 
@@ -133,14 +138,16 @@ parecer válida. Sem a chave, não.
 
 ## 5. Integridade do log: o encadeamento
 
-**Fonte:** SCHNEIER, B.; KELSEY, J. *Secure Audit Logs to Support Computer
-Forensics*. ACM Transactions on Information and System Security, v. 2, n. 2,
-p. 159-176, maio 1999.
-Versão aberta do autor disponível em: https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf
+**Fonte:** SCHNEIER, B.; KELSEY, J. Secure audit logs to support computer
+forensics. **ACM Transactions on Information and System Security**, [s. l.],
+v. 2, n. 2, p. 159-176, maio 1999. DOI: 10.1145/317087.317089. Disponível em:
+https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf.
 Acesso em: 24 set. 2026.
 
-Este é o artigo científico que embasa a proteção do log. Foi a versão aberta
-dos autores que a equipe leu.
+Este é o artigo científico que embasa a proteção do log. Os dados de volume,
+número, páginas e data foram conferidos no registro do DOI. O texto lido foi a
+versão aberta disponibilizada pelos autores, porque a do periódico é de acesso
+pago.
 
 **O que diz, textualmente,** no resumo:
 
@@ -176,10 +183,11 @@ ainda pode apagar o arquivo inteiro. Essa limitação está registrada em
 
 ## 6. Criptografia em repouso: AES-GCM
 
-**Fonte:** DWORKIN, M. *Recommendation for Block Cipher Modes of Operation:
-Galois/Counter Mode (GCM) and GMAC*. NIST Special Publication 800-38D.
-Gaithersburg: National Institute of Standards and Technology, nov. 2007.
-Disponível em: https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
+**Fonte:** DWORKIN, M. **Recommendation for block cipher modes of operation**:
+Galois/Counter Mode (GCM) and GMAC. Gaithersburg: National Institute of
+Standards and Technology, nov. 2007. (NIST Special Publication 800-38D).
+Disponível em:
+https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf.
 Acesso em: 24 set. 2026.
 
 **O que diz, textualmente,** sobre o nonce:
@@ -211,10 +219,9 @@ cifragem com `os.urandom`, atendendo ao requisito de unicidade.
 
 ## 7. Transporte: HSTS
 
-**Fonte:** HODGES, J.; JACKSON, C.; BARTH, A. *HTTP Strict Transport Security
-(HSTS)*. RFC 6797. IETF, nov. 2012. Categoria: Standards Track.
-Disponível em: https://www.rfc-editor.org/rfc/rfc6797.txt
-Acesso em: 24 set. 2026.
+**Fonte:** HODGES, J.; JACKSON, C.; BARTH, A. **HTTP strict transport security
+(HSTS)**. [S. l.]: IETF, nov. 2012. (RFC 6797). Disponível em:
+https://www.rfc-editor.org/rfc/rfc6797.txt. Acesso em: 24 set. 2026.
 
 **O que diz, textualmente,** no resumo:
 
@@ -240,10 +247,11 @@ A RFC confirma que o problema existe e não é resolvido por ela.
 
 ## 8. Proteção de dados pessoais
 
-**Fonte:** BRASIL. *Lei nº 13.709, de 14 de agosto de 2018*. Lei Geral de
-Proteção de Dados Pessoais (LGPD). Brasília, DF: Presidência da República,
-2018.
-Disponível em: https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm
+**Fonte:** BRASIL. **Lei nº 13.709, de 14 de agosto de 2018**. Dispõe sobre a
+proteção de dados pessoais e altera a Lei nº 12.965, de 23 de abril de 2014
+(Marco Civil da Internet). Brasília, DF: Presidência da República, 2018.
+Disponível em:
+https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm.
 Acesso em: 24 set. 2026.
 
 **Art. 7º, inciso I**, sobre a base legal usada hoje pelo sistema:
@@ -326,3 +334,86 @@ As três perguntas mais prováveis, e onde está a resposta:
 1. **Por que 19 MiB e não os 2 GiB da RFC?** Seção 2 deste documento.
 2. **Por que HMAC e não hash simples?** Seção 4 deste documento.
 3. **Por que consentimento se o serviço é público?** Seção 8 deste documento.
+
+---
+
+## 11. Referências
+
+Lista em ordem alfabética, conforme a ABNT NBR 6023:2018.
+
+BIRYUKOV, A.; DINU, D.; KHOVRATOVICH, D.; JOSEFSSON, S. **Argon2 memory-hard
+function for password hashing and proof-of-work applications**. [S. l.]: IETF,
+set. 2021. (RFC 9106). Disponível em: https://www.rfc-editor.org/rfc/rfc9106.txt.
+Acesso em: 24 set. 2026.
+
+BRASIL. **Lei nº 13.709, de 14 de agosto de 2018**. Dispõe sobre a proteção de
+dados pessoais e altera a Lei nº 12.965, de 23 de abril de 2014 (Marco Civil da
+Internet). Brasília, DF: Presidência da República, 2018. Disponível em:
+https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm. Acesso
+em: 24 set. 2026.
+
+DWORKIN, M. **Recommendation for block cipher modes of operation**:
+Galois/Counter Mode (GCM) and GMAC. Gaithersburg: National Institute of
+Standards and Technology, nov. 2007. (NIST Special Publication 800-38D).
+Disponível em:
+https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf.
+Acesso em: 24 set. 2026.
+
+HODGES, J.; JACKSON, C.; BARTH, A. **HTTP strict transport security (HSTS)**.
+[S. l.]: IETF, nov. 2012. (RFC 6797). Disponível em:
+https://www.rfc-editor.org/rfc/rfc6797.txt. Acesso em: 24 set. 2026.
+
+KRAWCZYK, H.; BELLARE, M.; CANETTI, R. **HMAC**: keyed-hashing for message
+authentication. [S. l.]: IETF, fev. 1997. (RFC 2104). Disponível em:
+https://www.rfc-editor.org/rfc/rfc2104.txt. Acesso em: 24 set. 2026.
+
+M'RAIHI, D.; MACHANI, S.; PEI, M.; RYDELL, J. **TOTP**: time-based one-time
+password algorithm. [S. l.]: IETF, maio 2011. (RFC 6238). Disponível em:
+https://www.rfc-editor.org/rfc/rfc6238.txt. Acesso em: 24 set. 2026.
+
+OWASP. **Password storage cheat sheet**. OWASP Cheat Sheet Series, [s. l.],
+[s. d.]. Disponível em:
+https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html.
+Acesso em: 24 set. 2026.
+
+SCHNEIER, B.; KELSEY, J. Secure audit logs to support computer forensics.
+**ACM Transactions on Information and System Security**, [s. l.], v. 2, n. 2,
+p. 159-176, maio 1999. DOI: 10.1145/317087.317089. Disponível em:
+https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf. Acesso
+em: 24 set. 2026.
+
+UNIVERSIDADE FEDERAL DE SANTA CATARINA. Biblioteca Universitária.
+**Procedimentos para elaboração de referências (ABNT NBR 6023:2018)**.
+Florianópolis: UFSC, 2019. Disponível em:
+https://repositorio.ufsc.br/handle/123456789/194316. Acesso em: 24 set. 2026.
+
+### Conferência cruzada
+
+Toda fonte citada no corpo do documento aparece na lista acima, e o contrário
+também vale.
+
+| Seção que cita | Entrada na lista |
+|---|---|
+| 1 | OWASP |
+| 2 | BIRYUKOV et al. |
+| 3 | M'RAIHI et al. |
+| 4 | KRAWCZYK; BELLARE; CANETTI |
+| 5 | SCHNEIER; KELSEY |
+| 6 | DWORKIN |
+| 7 | HODGES; JACKSON; BARTH |
+| 8 | BRASIL |
+| Nota de normalização | UNIVERSIDADE FEDERAL DE SANTA CATARINA |
+
+### Observações sobre a normalização
+
+- **Prenomes abreviados.** A norma permite abreviar, desde que de forma
+  uniforme. Como as RFCs trazem apenas as iniciais dos autores, abreviar em
+  toda a lista mantém a uniformidade sem precisar inferir nome completo de
+  ninguém.
+- **`[S. l.]` e `[s. d.]`.** Indicam, respectivamente, local e data não
+  identificados. As RFCs não têm cidade de publicação, e a página da OWASP é
+  atualizada continuamente, sem data fixa de edição.
+- **RFC e NIST SP como série.** O identificador de série vai entre parênteses
+  no fim, e não como parte do título.
+- **DOI no artigo de periódico.** Incluído porque é o identificador persistente
+  do registro e permite conferir os dados de volume, número e páginas.
