@@ -27,16 +27,31 @@ e envia via POST. Quem recebe essa requisição é a
 `LoginComDoisFatoresView` (em `usuarios/views.py`), uma versão
 personalizada da tela de login padrão do Django.
 
-### 3. Conferência da senha
+### 3. Verificação de bloqueio por força bruta
+
+Antes de conferir a senha, `LoginComDoisFatoresView.post` (em
+`usuarios/views.py`) consulta `usuario_bloqueado` (`usuarios/seguranca.py`)
+para aquele nome de usuário.
+
+- **Usuário bloqueado:** depois de 5 falhas seguidas em 15 minutos, a
+  requisição é recusada de imediato, com uma mensagem genérica, sem
+  chegar a conferir a senha.
+- **Usuário não bloqueado:** a view aplica um atraso proporcional às
+  falhas recentes daquele usuário (`calcular_atraso`, até 2,5 segundos)
+  e segue para o passo 4.
+
+### 4. Conferência da senha
 
 O Django compara a senha digitada com o hash salvo no banco, usando o
 algoritmo Argon2id configurado em `usuarios/hashers.py`.
 
 - **Senha incorreta:** o formulário retorna com erro, sem revelar se o
-  problema foi o usuário ou a senha (evita dar pistas para ataques).
-- **Senha correta:** segue para o passo 4.
+  problema foi o usuário ou a senha (evita dar pistas para ataques), e
+  `registrar_falha` soma mais uma tentativa ao contador do passo 3.
+- **Senha correta:** `limpar_tentativas` zera o contador desse usuário e
+  o fluxo segue para o passo 5.
 
-### 4. Verificação se o usuário tem 2FA ativado
+### 5. Verificação se o usuário tem 2FA ativado
 
 A `LoginComDoisFatoresView` consulta o model `DispositivoTOTP`
 (`dois_fatores/models.py`) para ver se existe um dispositivo
@@ -50,13 +65,13 @@ A `LoginComDoisFatoresView` consulta o model `DispositivoTOTP`
   (`usuario_pendente_id`) e redireciona para a tela de verificação do
   código.
 
-### 5. Digitação do código de 6 dígitos
+### 6. Digitação do código de 6 dígitos
 
 Na tela `templates/dois_fatores/verificar.html`, o usuário digita o
 código atual mostrado pelo app autenticador (Google Authenticator,
 Authy, etc.).
 
-### 6. Conferência do código
+### 7. Conferência do código
 
 A view `verificar`, em `dois_fatores/views.py`, usa a biblioteca
 `pyotp` para gerar o código esperado naquele momento a partir do
@@ -69,10 +84,10 @@ segredo salvo no banco, e compara com o que o usuário digitou
   remove a marca temporária da sessão, e o usuário é enviado para a
   página inicial.
 
-### 7. Após o login (qualquer um dos dois caminhos)
+### 8. Após o login (qualquer um dos dois caminhos)
 
-Assim que o `login()` do Django é chamado (seja no passo 4, sem 2FA,
-ou no passo 6, com 2FA), o sinal `user_logged_in` dispara a função
+Assim que o `login()` do Django é chamado (seja no passo 5, sem 2FA,
+ou no passo 7, com 2FA), o sinal `user_logged_in` dispara a função
 `gravar_inicio_da_sessao` (`usuarios/signals.py`), que registra o
 horário do início da sessão. Esse horário é usado depois pelo
 `TimeoutAbsolutoMiddleware` (`usuarios/middleware.py`) para encerrar
