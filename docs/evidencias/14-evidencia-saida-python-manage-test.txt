@@ -1,0 +1,109 @@
+Saida real e completa de "python manage.py test" (issue 6.10).
+
+Execucao em 24/09/2026, Python 3.13.15, Django 5.2.17.
+
+As linhas com data e hora misturadas aos pontos dos testes nao sao
+erro: sao os proprios eventos de seguranca (login, 2FA, recuperacao de
+senha) sendo gravados de verdade enquanto os testes que os disparam
+rodam, porque o handler de log fica ativo mesmo durante os testes.
+
+=== saida do comando ===
+
+Creating test database for alias 'default'...
+...2026-09-24 23:48:00,660 INFO seguranca.autenticacao login com sucesso, username=99998888
+.........2026-09-24 23:48:00,728 INFO seguranca.autenticacao login com sucesso, username=comum
+.2026-09-24 23:48:00,762 INFO seguranca.autenticacao login com sucesso, username=admin
+.2026-09-24 23:48:00,794 INFO seguranca.autenticacao login com sucesso, username=admin
+.........2026-09-24 23:48:01,037 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,074 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,107 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,110 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,139 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,170 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,225 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,227 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,258 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,294 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,341 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,344 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,374 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,409 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,442 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,476 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,508 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,575 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,578 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,612 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,614 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,644 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,648 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,679 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,682 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,714 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,716 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,745 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,779 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,782 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,826 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:01,828 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:01,859 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,892 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,924 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:01,978 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:02,043 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:02,049 INFO seguranca.dois_fatores codigo 2FA correto, username=usuario_teste
+2026-09-24 23:48:02,049 INFO seguranca.dois_fatores 2FA ativado, username=usuario_teste
+.2026-09-24 23:48:02,100 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:02,104 WARNING seguranca.dois_fatores codigo 2FA incorreto, username=usuario_teste
+.....2026-09-24 23:48:02,202 INFO seguranca.autenticacao login com sucesso, username=usuario_log_2fa
+.2026-09-24 23:48:02,259 INFO seguranca.autenticacao login com sucesso, username=usuario_log_2fa
+.2026-09-24 23:48:02,315 INFO seguranca.autenticacao login com sucesso, username=usuario_log_2fa
+2026-09-24 23:48:02,318 INFO seguranca.autenticacao logout, username=usuario_log_2fa
+2026-09-24 23:48:02,349 INFO seguranca.autenticacao login com sucesso, username=usuario_log_2fa
+.2026-09-24 23:48:02,399 INFO seguranca.autenticacao login com sucesso, username=usuario_log_2fa
+2026-09-24 23:48:02,403 INFO seguranca.autenticacao logout, username=usuario_log_2fa
+..2026-09-24 23:48:02,531 WARNING seguranca.dois_fatores codigo 2FA incorreto, username=usuario_com_2fa
+.2026-09-24 23:48:02,610 INFO seguranca.dois_fatores codigo 2FA correto, username=usuario_com_2fa
+2026-09-24 23:48:02,613 INFO seguranca.autenticacao login com sucesso, username=usuario_com_2fa
+..2026-09-24 23:48:02,720 INFO seguranca.dois_fatores codigo 2FA correto, username=usuario_com_2fa
+2026-09-24 23:48:02,723 INFO seguranca.autenticacao login com sucesso, username=usuario_com_2fa
+.2026-09-24 23:48:02,799 INFO seguranca.autenticacao login com sucesso, username=usuario_sem_2fa
+.2026-09-24 23:48:02,841 INFO seguranca.recuperacao_senha falha na recuperacao de senha, motivo=confirmacao_nao_confere, username=usuario_teste
+.2026-09-24 23:48:02,926 INFO seguranca.recuperacao_senha recuperacao de senha concluida com sucesso, username=usuario_teste
+2026-09-24 23:48:02,927 WARNING seguranca.recuperacao_senha falha na recuperacao de senha, motivo=token_ja_usado
+.2026-09-24 23:48:02,977 INFO seguranca.recuperacao_senha recuperacao de senha concluida com sucesso, username=usuario_teste
+.2026-09-24 23:48:03,052 INFO seguranca.recuperacao_senha recuperacao de senha concluida com sucesso, username=usuario_teste
+.2026-09-24 23:48:03,080 INFO seguranca.recuperacao_senha solicitacao de recuperacao de senha para username=usuario_teste
+.2026-09-24 23:48:03,107 INFO seguranca.recuperacao_senha solicitacao de recuperacao de senha para username=usuario_teste
+2026-09-24 23:48:03,110 INFO seguranca.recuperacao_senha solicitacao de recuperacao de senha para username=nao_existe
+....2026-09-24 23:48:03,257 INFO seguranca.recuperacao_senha recuperacao de senha concluida com sucesso, username=usuario_teste
+2026-09-24 23:48:03,259 WARNING seguranca.recuperacao_senha falha na recuperacao de senha, motivo=token_ja_usado
+......2026-09-24 23:48:03,517 WARNING seguranca.recuperacao_senha falha na recuperacao de senha, motivo=token_expirado
+2026-09-24 23:48:03,519 WARNING seguranca.recuperacao_senha falha na recuperacao de senha, motivo=token_ja_usado
+2026-09-24 23:48:03,520 WARNING seguranca.recuperacao_senha falha na recuperacao de senha, motivo=token_nao_encontrado
+.........2026-09-24 23:48:05,401 INFO seguranca.autenticacao login com sucesso, username=usuario_log
+.2026-09-24 23:48:05,439 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_bloqueado
+2026-09-24 23:48:06,002 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_bloqueado
+2026-09-24 23:48:07,027 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_bloqueado
+2026-09-24 23:48:08,566 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_bloqueado
+2026-09-24 23:48:10,628 WARNING seguranca.autenticacao tentativa de login com falha, username=usuario_bloqueado
+.2026-09-24 23:48:10,717 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:10,720 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:10,774 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:10,827 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:10,830 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:10,883 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+..2026-09-24 23:48:10,974 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:11,027 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+.2026-09-24 23:48:11,083 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:11,087 INFO seguranca.autenticacao logout, username=usuario_teste
+.2026-09-24 23:48:11,140 INFO seguranca.autenticacao login com sucesso, username=usuario_teste
+2026-09-24 23:48:11,144 INFO seguranca.autenticacao logout, username=usuario_teste
+..........
+----------------------------------------------------------------------
+Ran 109 tests in 10.667s
+
+OK
+Destroying test database for alias 'default'...
+Found 109 test(s).
+System check identified no issues (0 silenced).

@@ -1,0 +1,30 @@
+Evidencia do "python manage.py verificar_logs" (issue 6.10), com log
+integro e depois com log adulterado de proposito.
+
+Execucao em 24/09/2026, Python 3.13.15, Django 5.2.17.
+
+=== 1. Tres eventos reais gerados pela tela (login errado, login certo, logout) ===
+
+2026-09-24 23:46:44,731 WARNING seguranca.autenticacao tentativa de login com falha, username=evidencia_579 | mac=6b69ebc4dfae10d9b9b97ee33f8138cd6c6ec847b67834d42f97d2a22ffbcf85
+2026-09-24 23:46:54,246 INFO seguranca.autenticacao login com sucesso, username=evidencia_579 | mac=9f096fdd8925d7607ce7840e37f89a6e34ef568b51cbb08570b2e51f4ba69426
+2026-09-24 23:46:58,365 INFO seguranca.autenticacao logout, username=evidencia_579 | mac=506414722c93054166fba2c59563b9b060f1f8b376d82f10ff03ee66b83f1c64
+
+=== 2. "python manage.py verificar_logs" no log acima, sem alteracao ===
+
+Log íntegro: 3 linhas verificadas.
+Último MAC da cadeia: 506414722c93054166fba2c59563b9b060f1f8b376d82f10ff03ee66b83f1c64
+
+=== 3. Linha 2 adulterada de proposito (troquei "sucesso" por "SUCESSO", mantendo a assinatura antiga) ===
+
+2026-09-24 23:46:44,731 WARNING seguranca.autenticacao tentativa de login com falha, username=evidencia_579 | mac=6b69ebc4dfae10d9b9b97ee33f8138cd6c6ec847b67834d42f97d2a22ffbcf85
+2026-09-24 23:46:54,246 INFO seguranca.autenticacao login com SUCESSO, username=evidencia_579 | mac=9f096fdd8925d7607ce7840e37f89a6e34ef568b51cbb08570b2e51f4ba69426
+2026-09-24 23:46:58,365 INFO seguranca.autenticacao logout, username=evidencia_579 | mac=506414722c93054166fba2c59563b9b060f1f8b376d82f10ff03ee66b83f1c64
+
+=== 4. "python manage.py verificar_logs" no log adulterado ===
+
+CommandError: Log ALTERADO na linha 2: assinatura não confere (linha alterada, removida ou inserida)
+codigo de saida: 1
+
+A deteccao aponta exatamente a linha 2, que foi a alterada. Depois
+dessa verificacao, o arquivo local foi restaurado pra versao integra
+antes de continuar o trabalho.
