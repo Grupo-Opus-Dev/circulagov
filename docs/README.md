@@ -74,4 +74,13 @@ As ferramentas utilizadas na criação do sistema foram as seguintes:
 
 ---
 
+## 4. Fluxos e Segurança
+
+A documentação de fluxos de autenticação, recuperação de senha, direitos
+do titular e o fluxo de dados do sistema está reunida em
+[`FLUXOS.md`](FLUXOS.md), que serve como ponto único de entrada para
+esses documentos.
+
+---
+
 
