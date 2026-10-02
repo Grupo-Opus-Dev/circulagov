@@ -6,6 +6,7 @@ from django.contrib.sessions.models import Session
 from django.test import TestCase
 from django.urls import reverse
 
+from alunos.models import Aluno
 from dois_fatores.models import DispositivoTOTP
 from usuarios.signals import CHAVE_INICIO_SESSAO
 
@@ -218,3 +219,144 @@ class TesteEstadoDo2FANaTelaInicial(TestCase):
         DispositivoTOTP.objects.create(usuario=self.usuario, confirmado=False)
         resposta = self.client.get(reverse('usuarios:inicio'))
         self.assertContains(resposta, 'Configurar autenticação de dois fatores')
+
+
+class TesteAcessoAGestaoDeUsuarios(TestCase):
+    """A área de gestão expõe dados de todos os usuários, então o
+    controle de acesso dela é o que mais importa testar."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.comum = Usuario.objects.create_user(
+            username='comum', password=self.senha)
+        self.gestor = Usuario.objects.create_user(
+            username='gestor', password=self.senha, is_staff=True)
+        self.rotas = [
+            reverse('usuarios:gestao_lista'),
+            reverse('usuarios:gestao_novo'),
+            reverse('usuarios:gestao_detalhe', args=[self.comum.id]),
+        ]
+
+    def test_sem_login_nenhuma_rota_abre(self):
+        for rota in self.rotas:
+            with self.subTest(rota=rota):
+                self.assertEqual(self.client.get(rota).status_code, 302)
+
+    def test_usuario_comum_nao_entra(self):
+        self.client.login(username='comum', password=self.senha)
+        for rota in self.rotas:
+            with self.subTest(rota=rota):
+                self.assertEqual(self.client.get(rota).status_code, 302)
+
+    def test_usuario_staff_entra(self):
+        self.client.login(username='gestor', password=self.senha)
+        for rota in self.rotas:
+            with self.subTest(rota=rota):
+                self.assertEqual(self.client.get(rota).status_code, 200)
+
+    def test_atalho_na_tela_inicial_so_aparece_pra_staff(self):
+        self.client.login(username='comum', password=self.senha)
+        self.assertNotContains(
+            self.client.get(reverse('usuarios:inicio')), 'Gerenciar usuários')
+
+        self.client.login(username='gestor', password=self.senha)
+        self.assertContains(
+            self.client.get(reverse('usuarios:inicio')), 'Gerenciar usuários')
+
+
+class TesteListaDeUsuarios(TestCase):
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.gestor = Usuario.objects.create_user(
+            username='gestor', password=self.senha, is_staff=True)
+        self.client.login(username='gestor', password=self.senha)
+
+    def test_lista_mostra_os_usuarios(self):
+        Usuario.objects.create_user(username='ana', password=self.senha)
+        resposta = self.client.get(reverse('usuarios:gestao_lista'))
+        self.assertContains(resposta, 'ana')
+        self.assertContains(resposta, 'gestor')
+
+    def test_busca_filtra_por_nome_de_usuario(self):
+        Usuario.objects.create_user(username='ana', password=self.senha)
+        Usuario.objects.create_user(username='bruno', password=self.senha)
+        resposta = self.client.get(
+            reverse('usuarios:gestao_lista'), {'busca': 'ana'})
+        self.assertContains(resposta, 'ana')
+        self.assertNotContains(resposta, 'bruno')
+
+    def test_busca_encontra_pelo_ra_do_aluno(self):
+        aluno = Usuario.objects.create_user(
+            username='carla', password=self.senha, email='carla@escola.test')
+        Aluno.objects.create(
+            usuario=aluno, ra='RA-9988', nome_completo='Carla Souza')
+        resposta = self.client.get(
+            reverse('usuarios:gestao_lista'), {'busca': 'RA-9988'})
+        self.assertContains(resposta, 'carla')
+
+    def test_lista_nao_expoe_hash_de_senha(self):
+        """Mesmo sendo tela de gestão, o hash não tem por que aparecer."""
+        resposta = self.client.get(reverse('usuarios:gestao_lista'))
+        self.assertNotContains(resposta, 'argon2')
+
+
+class TesteCriacaoDeUsuario(TestCase):
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.gestor = Usuario.objects.create_user(
+            username='gestor', password=self.senha, is_staff=True)
+        self.client.login(username='gestor', password=self.senha)
+        self.dados = {
+            'username': 'novo_aluno',
+            'email': 'novo@escola.test',
+            'password1': 'SenhaForte!2026',
+            'password2': 'SenhaForte!2026',
+        }
+
+    def test_cria_usuario_comum(self):
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        criado = Usuario.objects.get(username='novo_aluno')
+        self.assertEqual(criado.email, 'novo@escola.test')
+        self.assertFalse(criado.is_staff)
+
+    def test_senha_e_guardada_como_hash(self):
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        criado = Usuario.objects.get(username='novo_aluno')
+        self.assertNotEqual(criado.password, 'SenhaForte!2026')
+        self.assertTrue(criado.check_password('SenhaForte!2026'))
+
+    def test_senha_fraca_e_recusada(self):
+        dados = self.dados | {'password1': '123456', 'password2': '123456'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        self.assertFalse(Usuario.objects.filter(username='novo_aluno').exists())
+
+    def test_ra_sem_nome_nao_cria_nada(self):
+        dados = self.dados | {'ra': 'RA-1'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        self.assertFalse(Usuario.objects.filter(username='novo_aluno').exists())
+
+    def test_ra_e_nome_criam_o_aluno_junto(self):
+        dados = self.dados | {'ra': 'RA-1234', 'nome_completo': 'Novo Aluno'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        criado = Usuario.objects.get(username='novo_aluno')
+        self.assertEqual(criado.aluno.ra, 'RA-1234')
+
+    def test_ra_repetido_e_recusado(self):
+        outro = Usuario.objects.create_user(
+            username='outro', password=self.senha, email='outro@escola.test')
+        Aluno.objects.create(
+            usuario=outro, ra='RA-1234', nome_completo='Outro Aluno')
+
+        dados = self.dados | {'ra': 'RA-1234', 'nome_completo': 'Novo Aluno'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        self.assertFalse(Usuario.objects.filter(username='novo_aluno').exists())
+
+    def test_criacao_de_usuario_vai_pro_log_de_seguranca(self):
+        """Criar conta muda quem tem acesso ao sistema, então é evento
+        de segurança e precisa ficar registrado com quem fez."""
+        with self.assertLogs('seguranca.gestao', level='INFO') as registro:
+            self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        texto = '\n'.join(registro.output)
+        self.assertIn('usuario criado', texto)
+        self.assertIn('novo_aluno', texto)
+        self.assertIn('criado_por=gestor', texto)
