@@ -6,6 +6,7 @@ from django.contrib.sessions.models import Session
 from django.test import TestCase
 from django.urls import reverse
 
+from dois_fatores.models import DispositivoTOTP
 from usuarios.signals import CHAVE_INICIO_SESSAO
 
 Usuario = get_user_model()
@@ -187,3 +188,33 @@ class TesteLogDeBloqueioPorForcaBruta(TestCase):
         # conferimos que a linha de bloqueio está em algum lugar dos logs,
         # sem depender da posição exata.
         self.assertIn('bloqueio por forca bruta', ' '.join(logs.output))
+
+
+class TesteEstadoDo2FANaTelaInicial(TestCase):
+    """A tela inicial precisa refletir o estado real do 2FA. Oferecer
+    "configurar" a quem já configurou leva a uma página que só avisa que
+    já está ativado, o que confunde."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password=self.senha
+        )
+        self.client.login(username='usuario_teste', password=self.senha)
+
+    def test_sem_2fa_a_tela_oferece_configurar(self):
+        resposta = self.client.get(reverse('usuarios:inicio'))
+        self.assertContains(resposta, 'Configurar autenticação de dois fatores')
+
+    def test_com_2fa_ativo_a_tela_mostra_que_esta_ativo(self):
+        DispositivoTOTP.objects.create(usuario=self.usuario, confirmado=True)
+        resposta = self.client.get(reverse('usuarios:inicio'))
+        self.assertContains(resposta, 'Autenticação de dois fatores ativa')
+        self.assertNotContains(
+            resposta, 'Configurar autenticação de dois fatores')
+
+    def test_dispositivo_criado_mas_nao_confirmado_ainda_oferece_configurar(self):
+        """Quem começou o cadastro e não terminou precisa poder voltar."""
+        DispositivoTOTP.objects.create(usuario=self.usuario, confirmado=False)
+        resposta = self.client.get(reverse('usuarios:inicio'))
+        self.assertContains(resposta, 'Configurar autenticação de dois fatores')
