@@ -9,6 +9,7 @@ Trabalho da disciplina **Políticas de Segurança da Informação**.
 
 | Documento | Para quê |
 |---|---|
+| [docs/GUIA_AVALIACAO.md](docs/GUIA_AVALIACAO.md) | **roteiro para testar cada item do checklist no sistema em produção** |
 | [docs/VISAO_GERAL.md](docs/VISAO_GERAL.md) | o que o sistema faz, o que não faz, e como rodar |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagramas de camadas, apps, requisição e chaves |
 | [docs/ANALISE_RISCOS.md](docs/ANALISE_RISCOS.md) | ativos, ameaças e contramedidas |
