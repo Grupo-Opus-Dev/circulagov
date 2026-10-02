@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from . import cripto
+from . import cripto, qrcode_totp
 from .models import DispositivoTOTP
 
 Usuario = get_user_model()
@@ -200,3 +200,52 @@ class TesteLogDeEventosDoisFatores(TestCase):
             self.client.post(reverse('dois_fatores:verificar'), {'codigo': '000000'})
 
         self.assertIn('codigo 2FA incorreto', logs.output[0])
+
+
+class TesteQrCodeDeCadastro(TestCase):
+    """Evidência do requisito 1.5: o cadastro do 2FA é feito pelo
+    front-end, escaneando um QR code, sem precisar digitar o segredo."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password=self.senha
+        )
+        self.client.login(username='usuario_teste', password=self.senha)
+
+    def test_tela_de_cadastro_mostra_um_qrcode(self):
+        # O id identifica o contêiner do QR. Procurar só por "<svg"
+        # casaria também com o logo do cabeçalho, em base.html.
+        resposta = self.client.get(reverse('dois_fatores:cadastrar'))
+        self.assertContains(resposta, 'id="qrcode-2fa"')
+
+    def test_segredo_manual_continua_disponivel(self):
+        """Quem não consegue escanear precisa do segredo em texto."""
+        dispositivo = DispositivoTOTP.objects.create(usuario=self.usuario)
+        resposta = self.client.get(reverse('dois_fatores:cadastrar'))
+        self.assertContains(resposta, dispositivo.segredo)
+
+    def test_svg_sai_pronto_pra_embutir_no_html(self):
+        svg = qrcode_totp.gerar_svg('otpauth://totp/Teste:ana?secret=ABCDEFGH')
+        self.assertTrue(svg.startswith('<svg'))
+        self.assertNotIn('<?xml', svg)
+        # Sem width e height fixos, quem manda no tamanho e o CSS.
+        self.assertNotIn('width=', svg)
+        self.assertNotIn('height=', svg)
+        self.assertIn('viewBox', svg)
+
+    def test_uris_diferentes_geram_qrcodes_diferentes(self):
+        """Prova que o QR codifica mesmo a URI recebida, e não um
+        desenho fixo."""
+        um = qrcode_totp.gerar_svg('otpauth://totp/Teste:ana?secret=AAAAAAAA')
+        outro = qrcode_totp.gerar_svg('otpauth://totp/Teste:bruno?secret=BBBBBBBB')
+        self.assertNotEqual(um, outro)
+
+    def test_qrcode_nao_aparece_depois_do_2fa_confirmado(self):
+        """Com o 2FA já ativo, mostrar o segredo de novo seria exposição
+        desnecessária."""
+        dispositivo = DispositivoTOTP.objects.create(
+            usuario=self.usuario, confirmado=True)
+        resposta = self.client.get(reverse('dois_fatores:cadastrar'))
+        self.assertNotContains(resposta, 'id="qrcode-2fa"')
+        self.assertNotContains(resposta, dispositivo.segredo)

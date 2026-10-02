@@ -17,12 +17,23 @@
     <p class="text-sm text-slate-600">O 2FA já está ativado na sua conta.</p>
   {% else %}
     <p class="text-sm text-slate-600 mb-4">
-      Cadastre este segredo em um app autenticador (Google Authenticator, Authy, etc.) e digite o código de 6 dígitos que ele mostrar.
+      Abra o app autenticador (Google Authenticator, Authy, etc.), escaneie o código abaixo e digite os 6 dígitos que ele mostrar.
     </p>
 
-    <div class="mb-4 rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-600 break-all">
-      <span class="font-medium text-slate-700">Segredo manual:</span> {{ dispositivo.segredo }}
+    <div class="mb-4 flex justify-center">
+      <div id="qrcode-2fa" class="w-48 h-48 bg-white p-2 rounded-md border border-slate-200 [&>svg]:w-full [&>svg]:h-full">
+        {{ qrcode_svg|safe }}
+      </div>
     </div>
+
+    <details class="mb-4">
+      <summary class="text-sm text-blue-700 cursor-pointer hover:underline">
+        Não consegue escanear? Cadastre o segredo manualmente
+      </summary>
+      <div class="mt-2 rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-600 break-all">
+        <span class="font-medium text-slate-700">Segredo:</span> {{ dispositivo.segredo }}
+      </div>
+    </details>
 
     <form method="post" class="space-y-4">
       {% csrf_token %}
