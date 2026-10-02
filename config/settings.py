@@ -49,6 +49,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serve os arquivos estaticos em producao. Com DEBUG=False o Django
+    # para de servi-los sozinho, e sem isso o /admin/ fica sem CSS.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -128,12 +131,44 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
+    # Atras de proxy reverso quem encerra o TLS e o nginx, entao a
+    # requisicao chega na aplicacao como HTTP. Sem este cabecalho o
+    # Django nao sabe que a conexao original era segura, o
+    # SECURE_SSL_REDIRECT redireciona de novo pra HTTPS e vira laco
+    # infinito. O nginx precisa enviar X-Forwarded-Proto.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # O Django 4+ exige a origem declarada pra aceitar POST vindo de
+    # HTTPS atras de proxy. Sem isso, login e consentimento falham.
+    CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+
+    # Em producao o Gunicorn roda com varios workers, e cada processo
+    # teria o proprio contador em memoria: 5 tentativas viram 5 por
+    # worker. Guardar no banco mantem a contagem unica (requisito 1.11).
+    # A tabela e criada com: python manage.py createcachetable
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'cache_bloqueio_login',
+        }
+    }
+
 # E-mail de recuperação de senha (requisito 2.1).
 # Console backend: em vez de mandar e-mail de verdade, escreve no
 # terminal onde o servidor está rodando. Serve pra desenvolvimento e
 # para gerar evidência nos testes, sem precisar de um servidor SMTP.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'nao-responda@circulagov.local'
+# Em desenvolvimento o padrao continua sendo o console, que escreve o
+# e-mail no terminal. Em producao as variaveis do .env apontam pra um
+# SMTP real, senao a recuperacao de senha nao chega em ninguem.
+EMAIL_BACKEND = env(
+    'EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = env('EMAIL_HOST', default='')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env(
+    'DEFAULT_FROM_EMAIL', default='nao-responda@circulagov.local')
 
 # Pasta dos logs de seguranca, nao versionada (ver .gitignore).
 LOG_DIR = BASE_DIR / 'logs'
@@ -209,6 +244,22 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Pasta onde o collectstatic junta tudo pro WhiteNoise servir.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# CompressedStaticFilesStorage comprime os arquivos mas nao usa manifesto
+# com hash no nome. O manifesto quebra o collectstatic se algum CSS
+# referenciar arquivo que nao existe, e aqui a simplicidade vale mais
+# que o cache-busting.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
