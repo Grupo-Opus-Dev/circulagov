@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
+from . import qrcode_totp
 from .models import DispositivoTOTP
 
 Usuario = get_user_model()
@@ -40,6 +41,8 @@ def cadastrar(request):
     return render(request, 'dois_fatores/cadastrar.html', {
         'dispositivo': dispositivo,
         'uri': uri,
+        # SVG embutido no HTML, gerado no servidor. Ver qrcode_totp.py.
+        'qrcode_svg': qrcode_totp.gerar_svg(uri),
     })
 
 
