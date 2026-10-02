@@ -37,8 +37,11 @@
       </div>
     </header>
 
-    <main class="flex-1 flex items-center justify-center px-4 py-12">
-      <div class="w-full max-w-md">{% block conteudo %}{% endblock %}</div>
+    <!-- largura e alinhamento sao blocos para as telas de gestao, que
+         precisam de mais espaco que os formularios estreitos. Sem
+         sobrescrever, o comportamento continua o mesmo de antes. -->
+    <main class="flex-1 flex {% block alinhamento %}items-center{% endblock %} justify-center px-4 py-12">
+      <div class="w-full {% block largura %}max-w-md{% endblock %}">{% block conteudo %}{% endblock %}</div>
     </main>
 
     <footer class="text-center text-xs text-slate-500 py-6">
