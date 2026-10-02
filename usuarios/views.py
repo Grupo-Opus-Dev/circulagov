@@ -66,4 +66,10 @@ class LoginComDoisFatoresView(LoginView):
 def inicio(request):
     """Página protegida só pra mostrar que o controle de acesso funciona:
     sem estar logado, o @login_required nem deixa chegar aqui."""
-    return render(request, 'usuarios/inicio.html')
+    # A tela precisa saber se o 2FA já está ativo pra não oferecer
+    # "configurar" a quem já configurou, o que leva a uma página que só
+    # diz que já está ativado.
+    tem_2fa = DispositivoTOTP.objects.filter(
+        usuario=request.user, confirmado=True
+    ).exists()
+    return render(request, 'usuarios/inicio.html', {'tem_2fa': tem_2fa})
