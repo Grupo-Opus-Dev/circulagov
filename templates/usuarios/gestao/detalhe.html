@@ -9,15 +9,18 @@
     <div class="w-12 h-12 shrink-0 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-semibold">
       {{ usuario_exibido.get_username|first|upper }}
     </div>
-    <div>
+    <div class="flex-1">
       <h1 class="text-xl font-semibold text-slate-900">{{ usuario_exibido.get_username }}</h1>
       <p class="text-sm text-slate-500">{{ usuario_exibido.email|default:"sem e-mail cadastrado" }}</p>
     </div>
+    <a href="{% url 'usuarios:gestao_editar' usuario_exibido.id %}" class="shrink-0 rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 transition">
+      Editar
+    </a>
   </div>
 
   {% if messages %}
     {% for mensagem in messages %}
-      <div class="mb-4 rounded-md bg-green-50 border border-green-200 text-green-700 px-4 py-3 text-sm">
+      <div class="mb-4 rounded-md {% if mensagem.tags == 'error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-green-50 border-green-200 text-green-700{% endif %} border px-4 py-3 text-sm">
         {{ mensagem }}
       </div>
     {% endfor %}
@@ -57,6 +60,44 @@
     {% else %}
       Não configurada.
     {% endif %}
+  </div>
+
+  {% if usuario_exibido.dispositivo_totp %}
+    <form method="post" action="{% url 'usuarios:gestao_remover_2fa' usuario_exibido.id %}" class="-mt-4 mb-6"
+          onsubmit="return confirm('Remover o 2FA de {{ usuario_exibido.get_username|escapejs }}? A pessoa volta a entrar só com a senha até cadastrar um aparelho novo.');">
+      {% csrf_token %}
+      <button type="submit" class="text-xs text-red-700 hover:underline">
+        Remover o 2FA desta conta
+      </button>
+      <span class="block text-xs text-slate-500 mt-0.5">
+        Use quando a pessoa perdeu o aparelho com o app autenticador.
+      </span>
+    </form>
+  {% endif %}
+
+  <h2 class="text-sm font-medium text-slate-700 mb-2">Senha</h2>
+  <div class="mb-6 rounded-md border border-slate-200 divide-y divide-slate-100">
+    <form method="post" action="{% url 'usuarios:gestao_enviar_link_senha' usuario_exibido.id %}" class="px-4 py-3">
+      {% csrf_token %}
+      <button type="submit" class="text-sm text-blue-700 hover:underline font-medium">
+        Enviar link de redefinição por e-mail
+      </button>
+      <span class="block text-xs text-slate-500 mt-0.5">
+        {% if usuario_exibido.email %}
+          A pessoa escolhe a senha sozinha. Ninguém mais fica sabendo.
+        {% else %}
+          Indisponível: esta conta não tem e-mail cadastrado.
+        {% endif %}
+      </span>
+    </form>
+    <div class="px-4 py-3">
+      <a href="{% url 'usuarios:gestao_definir_senha' usuario_exibido.id %}" class="text-sm text-slate-700 hover:underline font-medium">
+        Definir a senha manualmente
+      </a>
+      <span class="block text-xs text-slate-500 mt-0.5">
+        Para contas cujo e-mail não recebe mensagem. Você passa a conhecer a senha.
+      </span>
+    </div>
   </div>
 
   <h2 class="text-sm font-medium text-slate-700 mb-2">Aluno vinculado</h2>

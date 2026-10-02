@@ -138,11 +138,15 @@ class TelaEComandoDeIntegridadeTests(TestCase):
         self.caminho.write_text('\n'.join(linhas) + '\n', encoding='utf-8')
 
     def test_tela_exige_administrador(self):
+        # Era 302 enquanto a tela usava o staff_member_required, que
+        # mandava pro login do admin do Django. Agora quem ja esta
+        # logado e nao tem permissao recebe 403, porque redirecionar
+        # pra tela de entrar nao resolveria nada.
         comum = Usuario.objects.create_user(
             username='comum', password='Senha@12345')
         self.client.force_login(comum)
         resposta = self.client.get(reverse('auditoria:integridade'))
-        self.assertEqual(resposta.status_code, 302)
+        self.assertEqual(resposta.status_code, 403)
 
     def test_tela_mostra_log_integro(self):
         gravar_eventos(self.caminho, ['evento 1', 'evento 2'])

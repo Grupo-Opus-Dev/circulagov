@@ -1,11 +1,12 @@
 from django.conf import settings
-from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
+
+from usuarios.decoradores import exige_gestor
 
 from .integridade import verificar_arquivo
 
 
-@staff_member_required
+@exige_gestor
 def integridade(request):
     """Mostra se o log de segurança está íntegro.
 

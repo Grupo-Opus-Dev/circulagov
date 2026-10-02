@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block titulo %}Editar {{ usuario_exibido.get_username }} | CirculaGov{% endblock %}
+{% block largura %}max-w-lg{% endblock %}
+{% block alinhamento %}items-start{% endblock %}
+{% block conteudo %}
+<div class="bg-white rounded-lg shadow-sm border border-slate-200 p-8">
+  <h1 class="text-xl font-semibold text-slate-900 mb-1">Editar usuário</h1>
+  <p class="text-sm text-slate-500 mb-6">{{ usuario_exibido.get_username }}</p>
+
+  {% if e_a_propria_conta %}
+    <div class="mb-6 rounded-md bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm">
+      Esta é a sua própria conta. O acesso de gestão e a situação não podem ser
+      alterados aqui, para o sistema não ficar sem administrador.
+    </div>
+  {% endif %}
+
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+
+    {% for campo in formulario %}
+      {% if campo.name == 'ra' %}
+        <div class="pt-2 border-t border-slate-100">
+          <p class="text-sm font-medium text-slate-700 mb-1 mt-2">Vínculo com aluno</p>
+        </div>
+      {% endif %}
+
+      <div>
+        {% if campo.name == 'is_staff' or campo.name == 'is_active' %}
+          <label for="{{ campo.id_for_label }}" class="flex items-start gap-2 cursor-pointer">
+            {{ campo }}
+            <span>
+              <span class="block text-sm font-medium text-slate-700">{{ campo.label }}</span>
+              {% if campo.help_text %}
+                <span class="block text-xs text-slate-500">{{ campo.help_text }}</span>
+              {% endif %}
+            </span>
+          </label>
+        {% else %}
+          <label for="{{ campo.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">
+            {{ campo.label }}
+          </label>
+          {{ campo }}
+          {% if campo.help_text %}
+            <div class="mt-1 text-xs text-slate-500">{{ campo.help_text|safe }}</div>
+          {% endif %}
+        {% endif %}
+
+        {% for erro in campo.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ erro }}</p>
+        {% endfor %}
+      </div>
+    {% endfor %}
+
+    <button type="submit" class="w-full rounded-md bg-blue-900 text-white text-sm font-medium py-2.5 hover:bg-blue-800 transition">
+      Salvar
+    </button>
+  </form>
+
+  <p class="mt-6 text-sm text-center">
+    <a href="{% url 'usuarios:gestao_detalhe' usuario_exibido.id %}" class="text-blue-700 hover:underline">Cancelar</a>
+  </p>
+</div>
+{% endblock %}
