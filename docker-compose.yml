@@ -1,0 +1,53 @@
+services:
+
+  banco:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Volume nomeado: os dados sobrevivem a rebuild e a docker compose down.
+      - dados_postgres:/var/lib/postgresql/data
+    # Sem "ports". O banco so e alcancavel pela rede interna do compose,
+    # nunca pela internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Sobrescreve o DB_HOST do .env: dentro do compose o banco atende
+      # pelo nome do servico, nao por localhost.
+      DB_HOST: banco
+    volumes:
+      # O log de seguranca precisa de volume. Sem isso, cada rebuild
+      # apaga o arquivo e a cadeia de HMAC recomeca em silencio,
+      # destruindo a auditoria (requisito 5.3).
+      - logs_seguranca:/app/logs
+    ports:
+      # Amarrado no localhost de proposito. Publicar como "8000:8000"
+      # exporia o Gunicorn direto na internet, porque o Docker escreve
+      # as proprias regras de iptables e passa por cima do UFW.
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      banco:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+volumes:
+  dados_postgres:
+  logs_seguranca:

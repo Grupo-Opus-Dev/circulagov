@@ -1,0 +1,8 @@
+# Scripts e arquivos lidos dentro do container precisam de fim de linha
+# LF. Com CRLF, o shebang vira "#!/usr/bin/env bash\r" e o Linux
+# responde "bad interpreter: no such file or directory", erro que nao
+# deixa claro qual e o problema.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
