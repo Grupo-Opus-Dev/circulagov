@@ -3,7 +3,8 @@ import time
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
-from django.test import TestCase
+from django.core import mail
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from alunos.models import Aluno
@@ -237,16 +238,21 @@ class TesteAcessoAGestaoDeUsuarios(TestCase):
             reverse('usuarios:gestao_detalhe', args=[self.comum.id]),
         ]
 
-    def test_sem_login_nenhuma_rota_abre(self):
+    def test_sem_login_vai_pro_login_da_aplicacao(self):
+        """Nao pro /admin/login/, que tem a aparencia do Django."""
         for rota in self.rotas:
             with self.subTest(rota=rota):
-                self.assertEqual(self.client.get(rota).status_code, 302)
+                resposta = self.client.get(rota)
+                self.assertEqual(resposta.status_code, 302)
+                self.assertTrue(resposta.url.startswith('/contas/login/'))
 
-    def test_usuario_comum_nao_entra(self):
+    def test_usuario_comum_recebe_403(self):
+        """403, e nao redirecionamento: mandar quem ja esta logado pra
+        tela de entrar nao resolve nada."""
         self.client.login(username='comum', password=self.senha)
         for rota in self.rotas:
             with self.subTest(rota=rota):
-                self.assertEqual(self.client.get(rota).status_code, 302)
+                self.assertEqual(self.client.get(rota).status_code, 403)
 
     def test_usuario_staff_entra(self):
         self.client.login(username='gestor', password=self.senha)
@@ -360,3 +366,182 @@ class TesteCriacaoDeUsuario(TestCase):
         self.assertIn('usuario criado', texto)
         self.assertIn('novo_aluno', texto)
         self.assertIn('criado_por=gestor', texto)
+
+
+class TesteEdicaoDeUsuario(TestCase):
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.gestor = Usuario.objects.create_user(
+            username='gestor', password=self.senha,
+            email='gestor@escola.test', is_staff=True)
+        self.alvo = Usuario.objects.create_user(
+            username='alvo', password=self.senha, email='alvo@escola.test')
+        self.client.login(username='gestor', password=self.senha)
+        self.url = reverse('usuarios:gestao_editar', args=[self.alvo.id])
+
+    def test_altera_email(self):
+        self.client.post(self.url, {
+            'email': 'novo@escola.test', 'is_active': 'on'})
+        self.alvo.refresh_from_db()
+        self.assertEqual(self.alvo.email, 'novo@escola.test')
+
+    def test_promove_a_gestor(self):
+        self.client.post(self.url, {
+            'email': 'alvo@escola.test', 'is_staff': 'on', 'is_active': 'on'})
+        self.alvo.refresh_from_db()
+        self.assertTrue(self.alvo.is_staff)
+
+    def test_desativar_impede_o_login(self):
+        self.client.post(self.url, {'email': 'alvo@escola.test'})
+        self.alvo.refresh_from_db()
+        self.assertFalse(self.alvo.is_active)
+
+        outro = Client()
+        self.assertFalse(outro.login(username='alvo', password=self.senha))
+
+    def test_email_nao_pode_ficar_vazio(self):
+        """Sem e-mail a pessoa nao recupera a propria senha."""
+        self.client.post(self.url, {'email': '', 'is_active': 'on'})
+        self.alvo.refresh_from_db()
+        self.assertEqual(self.alvo.email, 'alvo@escola.test')
+
+    def test_vincula_aluno_na_edicao(self):
+        self.client.post(self.url, {
+            'email': 'alvo@escola.test', 'is_active': 'on',
+            'ra': '55443322', 'nome_completo': 'Alvo Da Silva'})
+        self.alvo.refresh_from_db()
+        self.assertEqual(self.alvo.aluno.ra, '55443322')
+
+    def test_nao_pode_remover_o_proprio_acesso_de_gestao(self):
+        """Senao o sistema pode ficar sem administrador nenhum."""
+        url = reverse('usuarios:gestao_editar', args=[self.gestor.id])
+        self.client.post(url, {'email': 'gestor@escola.test', 'is_active': 'on'})
+        self.gestor.refresh_from_db()
+        self.assertTrue(self.gestor.is_staff)
+
+    def test_nao_pode_desativar_a_propria_conta(self):
+        url = reverse('usuarios:gestao_editar', args=[self.gestor.id])
+        self.client.post(url, {'email': 'gestor@escola.test', 'is_staff': 'on'})
+        self.gestor.refresh_from_db()
+        self.assertTrue(self.gestor.is_active)
+
+    def test_edicao_vai_pro_log_de_seguranca(self):
+        with self.assertLogs('seguranca.gestao', level='INFO') as registro:
+            self.client.post(self.url, {
+                'email': 'novo@escola.test', 'is_active': 'on'})
+        texto = chr(10).join(registro.output)
+        self.assertIn('usuario alterado', texto)
+        self.assertIn('alterado_por=gestor', texto)
+
+
+class TesteSenhaPelaGestao(TestCase):
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.gestor = Usuario.objects.create_user(
+            username='gestor', password=self.senha, is_staff=True)
+        self.alvo = Usuario.objects.create_user(
+            username='alvo', password=self.senha, email='alvo@escola.test')
+        self.client.login(username='gestor', password=self.senha)
+
+    def test_administrador_define_senha_nova(self):
+        self.client.post(
+            reverse('usuarios:gestao_definir_senha', args=[self.alvo.id]),
+            {'new_password1': 'OutraSenha!2026',
+             'new_password2': 'OutraSenha!2026'})
+        self.alvo.refresh_from_db()
+        self.assertTrue(self.alvo.check_password('OutraSenha!2026'))
+
+    def test_senha_fraca_e_recusada(self):
+        self.client.post(
+            reverse('usuarios:gestao_definir_senha', args=[self.alvo.id]),
+            {'new_password1': '123456', 'new_password2': '123456'})
+        self.alvo.refresh_from_db()
+        self.assertTrue(self.alvo.check_password(self.senha))
+
+    def test_definir_senha_vai_pro_log(self):
+        with self.assertLogs('seguranca.gestao', level='WARNING') as registro:
+            self.client.post(
+                reverse('usuarios:gestao_definir_senha', args=[self.alvo.id]),
+                {'new_password1': 'OutraSenha!2026',
+                 'new_password2': 'OutraSenha!2026'})
+        self.assertIn('senha definida por administrador',
+                      chr(10).join(registro.output))
+
+    def test_envio_do_link_manda_email(self):
+        self.client.post(
+            reverse('usuarios:gestao_enviar_link_senha', args=[self.alvo.id]))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('alvo@escola.test', mail.outbox[0].to)
+
+    def test_sem_email_cadastrado_nao_envia_nada(self):
+        sem_email = Usuario.objects.create_user(
+            username='sem_email', password=self.senha)
+        self.client.post(
+            reverse('usuarios:gestao_enviar_link_senha', args=[sem_email.id]))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_envio_do_link_so_por_post(self):
+        self.client.get(
+            reverse('usuarios:gestao_enviar_link_senha', args=[self.alvo.id]))
+        self.assertEqual(len(mail.outbox), 0)
+
+
+class TesteRemocaoDoDoisFatores(TestCase):
+    """Única saída de quem perdeu o aparelho com o app autenticador.
+    Sem isto a conta fica inacessível para sempre."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.gestor = Usuario.objects.create_user(
+            username='gestor', password=self.senha, is_staff=True)
+        self.alvo = Usuario.objects.create_user(
+            username='alvo', password=self.senha)
+        self.client.login(username='gestor', password=self.senha)
+        self.url = reverse('usuarios:gestao_remover_2fa', args=[self.alvo.id])
+
+    def test_remove_o_dispositivo(self):
+        DispositivoTOTP.objects.create(usuario=self.alvo, confirmado=True)
+        self.client.post(self.url)
+        self.assertFalse(
+            DispositivoTOTP.objects.filter(usuario=self.alvo).exists())
+
+    def test_remocao_vai_pro_log_como_aviso(self):
+        """Reduz a proteção da conta, então precisa aparecer numa
+        leitura rápida do log."""
+        DispositivoTOTP.objects.create(usuario=self.alvo, confirmado=True)
+        with self.assertLogs('seguranca.gestao', level='WARNING') as registro:
+            self.client.post(self.url)
+        texto = chr(10).join(registro.output)
+        self.assertIn('2FA removido por administrador', texto)
+        self.assertIn('removido_por=gestor', texto)
+
+    def test_so_por_post(self):
+        DispositivoTOTP.objects.create(usuario=self.alvo, confirmado=True)
+        self.client.get(self.url)
+        self.assertTrue(
+            DispositivoTOTP.objects.filter(usuario=self.alvo).exists())
+
+    def test_usuario_comum_nao_remove_2fa_de_ninguem(self):
+        DispositivoTOTP.objects.create(usuario=self.alvo, confirmado=True)
+        Usuario.objects.create_user(username='comum', password=self.senha)
+        outro = Client()
+        outro.login(username='comum', password=self.senha)
+        self.assertEqual(outro.post(self.url).status_code, 403)
+        self.assertTrue(
+            DispositivoTOTP.objects.filter(usuario=self.alvo).exists())
+
+
+class TesteTelaDeAuditoriaUsaOLoginDaAplicacao(TestCase):
+    """A tela de integridade do log tinha o mesmo defeito das telas de
+    gestão: mandava para o login do admin do Django."""
+
+    def test_sem_login_vai_pro_login_da_aplicacao(self):
+        resposta = self.client.get(reverse('auditoria:integridade'))
+        self.assertTrue(resposta.url.startswith('/contas/login/'))
+
+    def test_usuario_comum_recebe_403(self):
+        Usuario.objects.create_user(
+            username='comum', password='SenhaDeTeste123')
+        self.client.login(username='comum', password='SenhaDeTeste123')
+        self.assertEqual(
+            self.client.get(reverse('auditoria:integridade')).status_code, 403)

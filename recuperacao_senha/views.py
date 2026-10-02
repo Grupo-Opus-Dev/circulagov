@@ -7,7 +7,7 @@ from django.core.mail import send_mail
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from .models import TokenRecuperacaoSenha
+from .models import MINUTOS_VALIDADE_TOKEN, TokenRecuperacaoSenha
 
 Usuario = get_user_model()
 
@@ -30,7 +30,7 @@ def solicitar(request):
         usuario = Usuario.objects.filter(username=nome_usuario).first()
 
         if usuario is not None:
-            _enviar_email_recuperacao(request, usuario)
+            enviar_email_recuperacao(request, usuario)
 
         # Registra a solicitacao de recuperacao (issue #30), independente do usuario existir.
         logger.info('solicitacao de recuperacao de senha para username=%s', nome_usuario)
@@ -41,7 +41,7 @@ def solicitar(request):
     return render(request, 'recuperacao_senha/solicitar.html')
 
 
-def _enviar_email_recuperacao(request, usuario):
+def enviar_email_recuperacao(request, usuario):
     registro, valor_bruto = TokenRecuperacaoSenha.gerar(usuario)
     link = request.build_absolute_uri(
         reverse('recuperacao_senha:redefinir', args=[valor_bruto])
@@ -51,7 +51,7 @@ def _enviar_email_recuperacao(request, usuario):
         message=(
             f'Olá, {usuario.get_username()}.\n\n'
             f'Use o link abaixo para redefinir sua senha. '
-            f'Ele vale por {registro.expira_em - registro.criado_em} '
+            f'Ele vale por {MINUTOS_VALIDADE_TOKEN} minutos '
             f'e só pode ser usado uma vez.\n\n{link}'
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,

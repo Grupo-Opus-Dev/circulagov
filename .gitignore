@@ -225,3 +225,6 @@ dev-cert.crt
 dev-cert.key
 
 .vscode/
+
+# Gerado pelo collectstatic, nao versionar.
+staticfiles/
