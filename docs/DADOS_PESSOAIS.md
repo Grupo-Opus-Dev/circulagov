@@ -20,7 +20,9 @@ registro novo que o próprio sistema teria que validar sozinho.
 ### Aluno
 
 O aluno tem **RA**, **nome completo** e **e-mail institucional**. O
-login é feito com RA e senha.
+login é feito com o nome de usuário da conta e a senha. O RA fica no
+cadastro de aluno ligado à conta, e o nome de usuário é escolhido por
+quem cria a conta, podendo ser o próprio RA.
 
 RA e nome completo bastam pro uso normal do sistema, porque, no fluxo
 pensado pro programa, quem toma a ação sobre um aluno com devolução
@@ -104,8 +106,9 @@ original nunca chega ao banco.
 |---|---|
 | `username` | Identificar de qual conta foi o evento de login, logout, 2FA ou recuperação de senha, pra investigar um incidente depois |
 
-Único dado pessoal gravado no log. Pro Aluno, esse `username` é o RA
-(ver seção 1). Nenhum outro dado da pessoa entra em nenhuma linha, e
+Único dado pessoal gravado no log. O `username` é escolhido por quem
+cria a conta: pode ser o RA ou outro identificador, e quando for um
+nome de pessoa também é dado pessoal (ver seção 1). Nenhum outro dado da pessoa entra em nenhuma linha, e
 senha, código do 2FA, segredo do TOTP e token de recuperação nunca são
 gravados. Detalhes de cada evento, exemplo de linha e por que cada
 campo existe em `LOGS_AUTENTICACAO.md`.

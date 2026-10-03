@@ -56,8 +56,8 @@ recuperação. Só o `username` do usuário envolvido.
 
 ## 4. Por que registrar o username, mesmo sendo dado pessoal
 
-Pro Aluno, o `username` é o RA (ver `docs/DADOS_PESSOAIS.md`), que é
-dado pessoal. Ainda assim, é o único jeito de um log de segurança
+O `username` é escolhido por quem cria a conta, e pode ser o RA ou um
+nome, que é dado pessoal (ver `docs/DADOS_PESSOAIS.md`). Ainda assim, é o único jeito de um log de segurança
 servir pra alguma coisa: sem saber *quem* tentou logar ou ativou o
 2FA, não dá pra investigar um incidente depois. É o mínimo necessário
 pra essa finalidade específica (auditoria de segurança), nenhum outro

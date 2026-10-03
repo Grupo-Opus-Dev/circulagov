@@ -6,9 +6,10 @@ from django.db import models
 class Aluno(models.Model):
     """Aluno da rede pública estadual de SP.
 
-    O RA também vira o `username` do Usuario ligado a esse aluno, então
-    o login continua funcionando pela tela normal, sem nenhuma view nova
-    (usuário digita o RA no campo de usuário e a senha).
+    Guarda o RA e o nome completo, e é ligado a uma conta de usuário. O
+    `username` dessa conta é escolhido por quem a cria e não precisa ser
+    o RA: o cadastro da gestão aceita os dois separados. O que o sistema
+    garante é só que o RA é único.
     """
 
     usuario = models.OneToOneField(
