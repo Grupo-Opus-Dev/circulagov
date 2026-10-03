@@ -145,7 +145,7 @@ perfil de gestão:
 | Lista de usuários, só gestão | `/gestao/usuarios/` |
 | Perfil, edição e senha de um usuário, só gestão | `/gestao/usuarios/<id>/` |
 | Novo usuário, só gestão | `/gestao/usuarios/novo/` |
-| Administração do Django | `/admin/` |
+| Administração do Django, entra pelo login da aplicação | `/admin/` |
 
 ## 6. O que não está implementado
 

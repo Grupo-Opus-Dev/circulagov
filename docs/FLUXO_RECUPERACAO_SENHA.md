@@ -65,9 +65,11 @@ usado (requisito 2.4) e se ainda está dentro do prazo de validade
 
 O usuário digita a senha nova duas vezes. Se as duas não conferem, a view
 mostra um erro e registra a falha no log. Se conferem, a view chama
-`set_password`, salva o usuário, marca o token como usado
-(`registro.marcar_usado()`, requisito 2.4) e registra o sucesso no log
-(requisito 2.7).
+`set_password`, salva o usuário e marca o token como usado
+(`registro.consumir()`, requisito 2.4), tudo dentro de uma transação, e
+registra o sucesso no log (requisito 2.7). O `consumir` é um UPDATE
+condicional: de dois pedidos simultâneos com o mesmo link, só um altera a
+linha e segue adiante.
 
 ## Por que a resposta é sempre igual, exista ou não o usuário
 

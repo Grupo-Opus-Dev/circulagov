@@ -1,4 +1,8 @@
+import time
+from unittest import mock
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
@@ -249,3 +253,123 @@ class TesteQrCodeDeCadastro(TestCase):
         resposta = self.client.get(reverse('dois_fatores:cadastrar'))
         self.assertNotContains(resposta, 'id="qrcode-2fa"')
         self.assertNotContains(resposta, dispositivo.segredo)
+
+
+class TesteTravaDoSegundoFator(TestCase):
+    """Com a senha certa, a pessoa chega na tela do código. Sem trava, dá
+    pra tentar os 10^6 códigos possíveis, e a etapa não expirava nunca."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.senha = 'SenhaDeTeste123'
+        self.usuario = Usuario.objects.create_user(
+            username='com_2fa', password=self.senha)
+        self.dispositivo = DispositivoTOTP.objects.create(
+            usuario=self.usuario, confirmado=True)
+
+    def _passar_pela_senha(self):
+        resposta = self.client.post(
+            reverse('login'),
+            {'username': 'com_2fa', 'password': self.senha})
+        self.assertRedirects(
+            resposta, reverse('dois_fatores:verificar'),
+            fetch_redirect_response=False)
+
+    def _errar(self, vezes):
+        for _ in range(vezes):
+            self.client.post(
+                reverse('dois_fatores:verificar'), {'codigo': '000000'})
+
+    def _logado(self):
+        return '_auth_user_id' in self.client.session
+
+    def test_codigo_certo_entra(self):
+        self._passar_pela_senha()
+        self.client.post(
+            reverse('dois_fatores:verificar'),
+            {'codigo': self.dispositivo.totp().now()})
+        self.assertTrue(self._logado())
+
+    def test_depois_de_5_erros_nem_o_codigo_certo_entra(self):
+        self._passar_pela_senha()
+        self._errar(5)
+        resposta = self.client.post(
+            reverse('dois_fatores:verificar'),
+            {'codigo': self.dispositivo.totp().now()})
+        self.assertEqual(resposta.status_code, 200)
+        self.assertFalse(self._logado())
+
+    def test_o_bloqueio_vale_mesmo_passando_pela_senha_de_novo(self):
+        self._passar_pela_senha()
+        self._errar(5)
+        self.client.logout()
+        self._passar_pela_senha()
+        self.client.post(
+            reverse('dois_fatores:verificar'),
+            {'codigo': self.dispositivo.totp().now()})
+        self.assertFalse(self._logado())
+
+    def test_tentativas_durante_o_bloqueio_nao_renovam_o_prazo(self):
+        self._passar_pela_senha()
+        self._errar(5)
+        agora = time.time()
+        for minuto in range(1, 11):
+            with mock.patch('time.time', return_value=agora + minuto * 60):
+                self._errar(3)
+        # Mais de 15 minutos depois do bloqueio, dentro de uma etapa nova.
+        with mock.patch('time.time', return_value=agora + 16 * 60):
+            self.client.logout()
+            self._passar_pela_senha()
+            self.client.post(
+                reverse('dois_fatores:verificar'),
+                {'codigo': self.dispositivo.totp().now()})
+            self.assertTrue(self._logado())
+
+    def test_acerto_zera_a_contagem(self):
+        self._passar_pela_senha()
+        self._errar(4)
+        self.client.post(
+            reverse('dois_fatores:verificar'),
+            {'codigo': self.dispositivo.totp().now()})
+        self.assertTrue(self._logado())
+        self.assertEqual(cache.get(f'tentativas_2fa_{self.usuario.pk}', 0), 0)
+
+    def test_bloqueio_vai_pro_log(self):
+        self._passar_pela_senha()
+        self._errar(5)
+        with self.assertLogs('seguranca.dois_fatores', level='WARNING') as logs:
+            self._errar(1)
+        self.assertIn('bloqueio por forca bruta no 2FA', ' '.join(logs.output))
+
+    def test_etapa_do_codigo_expira(self):
+        self._passar_pela_senha()
+        with mock.patch('time.time', return_value=time.time() + 5 * 60 + 1):
+            resposta = self.client.post(
+                reverse('dois_fatores:verificar'),
+                {'codigo': self.dispositivo.totp().now()})
+        self.assertRedirects(
+            resposta, reverse('login'), fetch_redirect_response=False)
+        self.assertFalse(self._logado())
+
+    def test_etapa_expirada_nao_volta_a_valer(self):
+        self._passar_pela_senha()
+        with mock.patch('time.time', return_value=time.time() + 5 * 60 + 1):
+            self.client.get(reverse('dois_fatores:verificar'))
+        resposta = self.client.get(reverse('dois_fatores:verificar'))
+        self.assertRedirects(
+            resposta, reverse('login'), fetch_redirect_response=False)
+
+    def test_expiracao_vai_pro_log(self):
+        self._passar_pela_senha()
+        with mock.patch('time.time', return_value=time.time() + 5 * 60 + 1):
+            with self.assertLogs(
+                    'seguranca.dois_fatores', level='WARNING') as logs:
+                self.client.get(reverse('dois_fatores:verificar'))
+        self.assertIn('etapa do 2FA expirou', ' '.join(logs.output))
+
+    def test_dentro_do_prazo_a_etapa_segue_valendo(self):
+        self._passar_pela_senha()
+        with mock.patch('time.time', return_value=time.time() + 4 * 60):
+            resposta = self.client.get(reverse('dois_fatores:verificar'))
+        self.assertEqual(resposta.status_code, 200)

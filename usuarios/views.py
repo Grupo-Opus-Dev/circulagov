@@ -6,8 +6,11 @@ from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect, render
 
 from dois_fatores.models import DispositivoTOTP
-from dois_fatores.views import CHAVE_USUARIO_PENDENTE
-from .seguranca import calcular_atraso, limpar_tentativas, registrar_falha, usuario_bloqueado
+from dois_fatores.views import iniciar_etapa_pendente
+from .seguranca import (
+    calcular_atraso, ip_do_cliente, limpar_tentativas, registrar_falha,
+    usuario_bloqueado,
+)
 
 logger = logging.getLogger('seguranca.autenticacao')
 
@@ -22,8 +25,9 @@ class LoginComDoisFatoresView(LoginView):
 
     def post(self, request, *args, **kwargs):
         nome_usuario = request.POST.get('username', '')
+        ip = ip_do_cliente(request)
 
-        if nome_usuario and usuario_bloqueado(nome_usuario):
+        if nome_usuario and usuario_bloqueado(nome_usuario, ip):
             # Requisito 5.2: esse bloqueio acontece antes mesmo de tentar
             # autenticar, então é um evento diferente da falha de login comum.
             logger.warning('bloqueio por forca bruta, username=%s', nome_usuario)
@@ -33,22 +37,25 @@ class LoginComDoisFatoresView(LoginView):
                 'Muitas tentativas de login com esse usuário. '
                 'Aguarde alguns minutos e tente novamente.',
             )
-            return self.form_invalid(formulario)
+            # Vai pelo form_invalid do pai de propósito: o desta classe
+            # soma uma falha, e somar durante o bloqueio renovaria o prazo
+            # de quem insiste, que nunca mais sairia dele.
+            return super().form_invalid(formulario)
 
         if nome_usuario:
-            time.sleep(calcular_atraso(nome_usuario))
+            time.sleep(calcular_atraso(nome_usuario, ip))
 
         return super().post(request, *args, **kwargs)
 
     def form_invalid(self, formulario):
         nome_usuario = formulario.data.get('username', '')
         if nome_usuario:
-            registrar_falha(nome_usuario)
+            registrar_falha(nome_usuario, ip_do_cliente(self.request))
         return super().form_invalid(formulario)
 
     def form_valid(self, formulario):
         usuario = formulario.get_user()
-        limpar_tentativas(usuario.get_username())
+        limpar_tentativas(usuario.get_username(), ip_do_cliente(self.request))
 
         dispositivos_confirmados = DispositivoTOTP.objects.filter(
             usuario=usuario, confirmado=True
@@ -56,7 +63,7 @@ class LoginComDoisFatoresView(LoginView):
         tem_2fa = dispositivos_confirmados.exists()
 
         if tem_2fa:
-            self.request.session[CHAVE_USUARIO_PENDENTE] = usuario.pk
+            iniciar_etapa_pendente(self.request.session, usuario.pk)
             return redirect('dois_fatores:verificar')
 
         return super().form_valid(formulario)

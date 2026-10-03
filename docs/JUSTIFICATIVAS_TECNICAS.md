@@ -44,7 +44,8 @@ dos sistemas com 2FA hoje.
 (ver `dois_fatores/views.py` e `FLUXO_AUTENTICACAO.md`). Isso garante
 que a senha sozinha nunca é suficiente para autenticar quem tem 2FA
 ativado. Mesmo que um invasor descubra a senha de alguém, ainda
-precisa do código do app autenticador.
+precisa do código do app autenticador. Isso vale para todo caminho de
+entrada porque o login do admin também passa por aqui (seção 12).
 
 **Por que o 2FA é opcional:** para o MVP, exigir 2FA de todo mundo
 adicionaria fricção desnecessária no cadastro inicial. A abordagem
@@ -158,12 +159,29 @@ precisaria de milhares de tentativas para ter chance de acertar uma
 senha com Argon2, se torna impraticável com esse limite combinado ao
 atraso progressivo.
 
-**Por que o bloqueio é por username e não por IP:** bloquear por IP
-sozinho permitiria que um invasor usasse vários IPs diferentes (bem
-comum em ataques reais) para contornar o limite. Bloquear por
-username garante que aquela conta específica fica protegida
-independentemente de onde vêm as tentativas, é a mesma lógica usada
-por grande parte dos sistemas de login com proteção anti-força-bruta.
+**Por que o bloqueio é por usuário e endereço, com um teto por conta:**
+bloquear só por endereço deixaria um invasor trocar de endereço (comum em
+ataques reais) para contornar o limite. Bloquear só por usuário deixaria
+qualquer pessoa trancar a conta de outra apenas errando a senha dela. Por
+isso há dois contadores:
+
+- por par (usuário, endereço): 5 falhas em 15 minutos bloqueiam aquele
+  endereço para aquele usuário, sem afetar quem acessa de outro lugar;
+- por conta, somando todos os endereços: 25 falhas em 15 minutos bloqueiam
+  a conta para todos. O teto é alto para que o dono da conta não seja
+  trancado por um ou dois atacantes, e baixo o bastante para que tentar
+  senhas de muitos endereços deixe de compensar.
+
+O endereço vem do cabeçalho `X-Real-IP`, que o nginx sobrescreve com o
+endereço real da conexão (`CABECALHO_IP_DO_CLIENTE` em `config/settings.py`).
+O cabeçalho não pode vir do cliente, porque o nginx o substitui sempre.
+
+**Por que o bloqueio não é renovado enquanto dura:** a contagem começa na
+primeira falha e, ao chegar no limite, recomeça por 15 minutos cheios.
+Tentativas feitas durante o bloqueio não somam. Antes, cada uma delas
+reiniciava o prazo, e quem continuava tentando, inclusive o próprio dono da
+conta, ficava bloqueado indefinidamente. Os testes estão em
+`TesteBloqueioDeLoginPorEndereco`, em `usuarios/tests.py`.
 
 ## 6. Model de usuário customizado
 
@@ -314,6 +332,90 @@ uma única finalidade. Se uma vazar, a outra proteção continua valendo.
 **Por que a tela de verificação é só para administradores:** o
 resultado mostra em qual linha o log foi alterado, informação que
 ajudaria um invasor a testar se conseguiu esconder rastros.
+
+## 12. O admin do Django usa o login da aplicação
+
+**Onde:** `usuarios/admin_site.py`, `usuarios/admin_config.py` e `INSTALLED_APPS`
+em `config/settings.py`
+
+O admin do Django traz um login próprio, com formulário e rota próprios
+(`/admin/login/`). Esse login não passa pelo segundo fator nem pelo bloqueio por
+tentativas, que existem só no login da aplicação. Resultado, comprovado por
+teste: quem tinha a senha de uma conta de gestão entrava no `/admin/` sem o
+código, mesmo com o 2FA ativo, e podia tentar senhas sem limite. O limite do
+nginx também não cobria esse caminho.
+
+O que a documentação afirmava, que a senha sozinha nunca basta para quem tem
+2FA, valia só para o login da aplicação.
+
+**A correção** troca o site de administração por um que não autentica ninguém. O
+`/admin/login/` passou a só redirecionar para o login da aplicação, e o admin
+aceita a sessão que sai de lá. Assim ele herda o segundo fator e o bloqueio por
+tentativas, sem duplicar código. A troca usa o mecanismo documentado do Django
+para substituir o site padrão, e não altera tabelas.
+
+**Por que não só desligar o `/admin/`:** ele continua útil para consultar e
+corrigir dados que a área de gestão não cobre. Desligar tiraria essa
+ferramenta sem necessidade, agora que o contorno acabou.
+
+**O que continua valendo.** O 2FA segue opcional: uma conta de gestão que nunca o
+ativou entra no admin só com a senha, como entra na aplicação. Exigir o segundo
+fator de toda conta de gestão seria uma decisão de política, e não foi tomada.
+
+## 13. Trava de tentativas e prazo no segundo fator
+
+**Onde:** `dois_fatores/limite.py` e `dois_fatores/views.py`
+
+O código TOTP tem 6 dígitos. Quem já sabe a senha de uma conta chega na tela
+do código, e sem trava poderia tentar muitos códigos até acertar o da janela
+de 30 segundos. A etapa também não expirava: a sessão com a senha aceita
+continuava aberta enquanto houvesse requisições.
+
+**Por que a trava é por conta e não por endereço:** nessa etapa a conta já
+está identificada pela senha certa. Contar por endereço deixaria quem troca de
+endereço ganhar tentativas novas. Como o bloqueio só é alcançável por quem
+acertou a senha, ele não serve para trancar a conta de um desconhecido.
+
+**Por que 5 tentativas em 15 minutos:** a chance de acertar um código de 6
+dígitos em 5 tentativas é de 5 em 1 milhão por janela, e dá folga para quem
+erra a digitação ou o relógio do celular está um pouco fora.
+
+**Por que o bloqueio não é renovado enquanto dura:** durante o bloqueio a
+verificação nem confere o código, e a falha não soma. Se somasse, cada
+tentativa reiniciaria o prazo. Nem o código certo entra durante o bloqueio, e
+ele também vale se a pessoa passar pela senha de novo, porque o contador está
+na conta e não na sessão.
+
+**Por que a etapa expira em 5 minutos:** é tempo de sobra para abrir o app e
+digitar seis números. Passado o prazo, a pessoa volta ao login. O prazo evita
+que uma sessão esquecida na tela do código continue valendo.
+
+Os testes estão em `TesteTravaDoSegundoFator`, em `dois_fatores/tests.py`.
+
+## 14. Recuperação de senha: uso único atômico e limite de e-mails por conta
+
+**Onde:** `recuperacao_senha/models.py` e `recuperacao_senha/views.py`
+
+**Uso único.** A versão anterior conferia o token, trocava a senha e só então
+o marcava como usado, sem transação. Dois pedidos simultâneos com o mesmo link
+passavam os dois pela conferência. Agora o token é consumido por um
+`UPDATE ... WHERE usado_em IS NULL AND expira_em >= agora`, e o banco decide
+quem ganhou: só quem alterou uma linha segue. O consumo e a troca da senha
+ficam na mesma transação, então uma falha ao gravar a senha devolve o token.
+A senha é salva só no campo `password` (`update_fields`), pra não regravar o
+restante do usuário com dados que podem ter mudado.
+
+**Por que não só um `select_for_update`:** funcionaria, mas o UPDATE condicional
+é um passo só, não depende de lembrar de travar a linha antes de ler e deixa
+a decisão no banco.
+
+**Limite de e-mails.** O nginx limita por endereço. Quem usa muitos endereços
+ainda poderia encher a caixa de uma pessoa e gastar a cota diária de envios da
+conta. O limite por conta é de 3 e-mails por hora, contados no cache com
+janela fixa. Os pedidos além disso recebem a mesma resposta genérica de
+sempre, para não revelar que a conta existe, e vão para o log. O convite da
+gestão não entra nessa conta, porque é uma ação de um gestor autenticado, e
+não um pedido anônimo.
 
 ## 15. CSS sem CDN e política de conteúdo (CSP)
 

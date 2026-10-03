@@ -110,7 +110,7 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 ### 10. Força bruta no código do segundo fator
 
-**Descrição:** Quem já conhece a senha de uma conta com 2FA pode tentar códigos de 6 dígitos na etapa de verificação. Essa etapa não tem trava de tentativas por conta no código.
+**Descrição:** Quem já conhece a senha de uma conta com 2FA pode tentar códigos de 6 dígitos na etapa de verificação. Sem trava de tentativas por conta e sem prazo para digitar o código, a sessão com a senha já aceita ficava aberta para tentar à vontade.
 
 **Ativo afetado:** Contas protegidas por segundo fator.
 
@@ -132,6 +132,30 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Indisponibilidade da recuperação de senha e incômodo ao titular da conta.
 
+### 13. Contorno do segundo fator pelo admin do Django
+
+**Descrição:** O admin do Django tem login próprio, que não passava pelo segundo fator nem pelo bloqueio por tentativas. Quem soubesse a senha de uma conta de gestão entrava no `/admin/` sem o código, e podia tentar senhas sem limite.
+
+**Ativo afetado:** Contas de gestão e o painel administrativo.
+
+**Impacto:** Acesso administrativo sem o segundo fator, anulando a proteção que o 2FA deveria dar justamente às contas mais poderosas.
+
+### 14. Bloqueio de login que nunca termina
+
+**Descrição:** Cada tentativa feita durante o bloqueio por força bruta reiniciava o prazo de 15 minutos. Quem continuasse tentando ficava bloqueado indefinidamente. Um atacante podia, por isso, manter uma conta de vítima trancada enviando uma tentativa a cada poucos minutos, e o próprio dono da conta se trancava ao insistir.
+
+**Ativo afetado:** Disponibilidade das contas.
+
+**Impacto:** Negação de acesso a uma conta específica, sem precisar da senha.
+
+### 15. Uso duplo do link de recuperação
+
+**Descrição:** A recuperação conferia se o token era válido e só depois o marcava como usado, em passos separados e sem transação. Dois pedidos simultâneos com o mesmo link passavam os dois pela conferência, e o link de uso único servia duas vezes. Se a gravação da senha falhasse no meio, o estado também ficava inconsistente.
+
+**Ativo afetado:** Tokens de recuperação e senhas.
+
+**Impacto:** Quem interceptasse um link poderia usá-lo ao mesmo tempo que o dono, e o requisito de uso único deixava de valer.
+
 ### 16. Script de terceiro sem controle e ausência de política de conteúdo
 
 **Descrição:** O CSS do Tailwind era montado no navegador por um script carregado de `cdn.tailwindcss.com`, sem integridade verificada e sem política de conteúdo (CSP) no site. Se esse domínio fosse comprometido, o código dele rodaria dentro das páginas de login, 2FA e gestão. Sem CSP, qualquer HTML injetado por uma falha de escape também executaria sem restrição.
@@ -146,7 +170,6 @@ Além das ameaças já consideradas pelo projeto, outras ameaças podem ser iden
 
 Lacunas conhecidas hoje:
 
-- a verificação do segundo fator e o pedido de recuperação de senha não têm trava de tentativas por conta no código (ameaças 10 e 12)
 - o limite de requisições por endereço não barra um ataque distribuído por muitos endereços
 - não há backup do banco nem do log de segurança
 
@@ -288,11 +311,11 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Risco resultante:** Médio
 
-**Contramedida implementada:** Limite de requisições por endereço na verificação do segundo fator, 10 por minuto, no nginx. Instalado no servidor em 03/10/2026 e conferido de fora, pela internet.
+**Contramedida implementada:** Na aplicação, 5 códigos errados por conta bloqueiam a verificação por 15 minutos, e tentativas durante o bloqueio não renovam o prazo. A etapa do código expira 5 minutos depois da senha aceita. Além disso, limite de requisições por endereço na verificação, 10 por minuto, no nginx, instalado no servidor em 03/10/2026 e conferido de fora, pela internet.
 
-**Onde está no código:** `deploy/nginx/circulagov-limites.conf`. Não há trava por conta na aplicação.
+**Onde está no código:** `dois_fatores/limite.py` e `dois_fatores/views.py`. O nginx está em `deploy/nginx/circulagov-limites.conf`. Os testes estão em `TesteTravaDoSegundoFator`, em `dois_fatores/tests.py`.
 
-**Risco residual:** Médio. O limite reduz a velocidade por endereço, mas não impede um ataque distribuído, e a aplicação continua sem bloquear a conta.
+**Risco residual:** Baixo. São 5 tentativas em 15 minutos contra 1 milhão de códigos possíveis, e o código muda a cada 30 segundos.
 
 ### 11. Zerar o bloqueio de login com nomes inventados
 
@@ -316,11 +339,51 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Risco resultante:** Médio
 
-**Contramedida implementada:** Limite de requisições por endereço no pedido de recuperação, 3 por minuto, no nginx.
+**Contramedida implementada:** Na aplicação, no máximo 3 e-mails de recuperação por conta por hora; os pedidos além disso recebem a mesma resposta de sempre, sem e-mail e com registro no log. Além disso, limite de requisições por endereço no pedido de recuperação, 3 por minuto, no nginx.
 
-**Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
+**Onde está no código:** `recuperacao_senha/views.py` (`pode_enviar_email`) e `deploy/nginx/circulagov-limites.conf`. Os testes estão em `TesteLimiteDeEmailsPorConta`, em `recuperacao_senha/tests.py`.
 
 **Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.
+
+### 13. Contorno do segundo fator pelo admin do Django
+
+**Probabilidade:** Média
+
+**Impacto:** Alta
+
+**Risco resultante:** Alto
+
+**Contramedida implementada:** O `/admin/login/` deixou de autenticar e só redireciona para o login da aplicação. O admin aceita a sessão que sai de lá, e assim herda o segundo fator e o bloqueio por tentativas.
+
+**Onde está no código:** `usuarios/admin_site.py`, `usuarios/admin_config.py` e `config/settings.py`. A classe `TesteAdminUsaOLoginDaAplicacao`, em `usuarios/tests.py`, cobre o caso, e quatro de seus testes falham contra o admin antigo.
+
+**Risco residual:** Baixo para quem ativou o 2FA. O 2FA continua opcional, então uma conta de gestão que nunca o ativou ainda entra só com a senha.
+
+### 14. Bloqueio de login que nunca termina
+
+**Probabilidade:** Média
+
+**Risco residual:** Baixo. No máximo 72 e-mails por dia para uma conta, bem abaixo da cota diária de envios. Quem quiser ainda pode gastar esses 3 por hora contra uma conta, e a pessoa recebe esses e-mails.
+
+### 15. Uso duplo do link de recuperação
+
+**Probabilidade:** Baixa
+
+**Impacto:** Média
+
+**Risco resultante:** Médio
+
+**Contramedida implementada:** Tentativas feitas durante o bloqueio não renovam o prazo. O bloqueio passou a valer por par (usuário, endereço), com teto de 25 falhas por conta somando todos os endereços. Assim, um endereço isolado não tranca a conta para os demais, e quem troca de endereço a cada 5 tentativas também é barrado.
+
+**Onde está no código:** `usuarios/seguranca.py`, `usuarios/views.py` e `CABECALHO_IP_DO_CLIENTE` em `config/settings.py`. Os testes estão em `TesteBloqueioDeLoginPorEndereco`, em `usuarios/tests.py`.
+
+**Risco residual:** Médio-baixo. Um atacante com muitos endereços ainda pode manter o teto de 25 da conta atingido e trancar a vítima. O limite protege a conta contra adivinhação, e o custo é essa indisponibilidade temporária.
+
+**Contramedida implementada:** O token é consumido por um UPDATE condicional (`consumir`), decidido pelo banco, dentro de uma transação junto com a troca da senha. De dois pedidos simultâneos, só um segue; se a gravação da senha falhar, o token volta a valer.
+
+**Onde está no código:** `recuperacao_senha/models.py` (`consumir`) e `recuperacao_senha/views.py`. O teste `test_dois_pedidos_pelo_mesmo_link_so_um_troca_a_senha`, em `TesteUsoSimultaneoDoToken`, falha com o código antigo.
+
+**Risco residual:** Baixo.
 
 ### 16. Script de terceiro sem controle e ausência de política de conteúdo
 
