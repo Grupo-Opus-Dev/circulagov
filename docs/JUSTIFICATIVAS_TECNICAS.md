@@ -93,9 +93,8 @@ válido para sempre no servidor. Invalidar no banco fecha essa brecha.
 
 **Onde:** `usuarios/seguranca.py`, usado em `usuarios/views.py`
 
-A proteção combina três camadas, todas usando a interface de **cache**
-nativa do Django (`django.core.cache`), sem um model próprio para as
-tentativas:
+A proteção combina três camadas, com o contador numa tabela própria do
+banco (`ContadorDeTentativas`, em `usuarios/contadores.py`):
 
 - **Contagem de tentativas (rate limit):** cada senha errada soma uma
   falha, associada ao nome de usuário digitado.
@@ -107,35 +106,35 @@ tentativas:
   ataques automatizados que dependem de testar muitas senhas por
   segundo.
 
-**Por que usar a interface de cache:** contar tentativas de login é,
-por natureza, um dado temporário: depois de alguns minutos, a informação
-não importa mais. O cache já entrega expiração automática, o que evita
-escrever e manter uma rotina de limpeza.
+**Por que o contador fica no banco, e não no cache.** Contar tentativas é um
+dado temporário, e a primeira versão usava o cache do Django. Em produção o
+Gunicorn roda vários processos, então o contador precisa ser único entre
+eles, o que levou ao cache em tabela do PostgreSQL. Isso se mostrou
+insuficiente por dois motivos, e o contador passou a ser uma tabela própria:
 
-**Qual cache em cada ambiente.** Em desenvolvimento, com um processo só,
-vale o cache em memória padrão do Django. Em produção o Gunicorn roda
-vários processos, e com cache em memória cada um teria a própria
-contagem: as 5 tentativas viram 5 por processo. Por isso, com
-`DEBUG=False`, o contador fica numa **tabela de cache no PostgreSQL**
-(`cache_bloqueio_login`), única para todos os processos. Foi escolhido em
-vez do Redis porque o banco já existe, e subir mais um serviço só para
-isso não se justificava no tamanho do projeto.
+- **Contagem perdida.** O `incr()` do cache em banco lê o valor e depois
+  grava, em passos separados, e a documentação do Django não o garante
+  atômico. Duas falhas simultâneas podiam contar como uma. Agora cada soma
+  trava a linha do contador (`SELECT ... FOR UPDATE`) dentro de uma
+  transação, e a criação simultânea da mesma chave é tratada. Os testes de
+  `TesteContadoresAtomicos` disparam as falhas em threads ao mesmo tempo, e
+  quatro deles falham quando o travamento é removido.
+- **Descarte por ordem alfabética.** O cache em banco apagava um terço das
+  entradas, por ordem alfabética da chave, ao passar de um teto de entradas
+  (300 por padrão), e quem tentava senhas contra uma conta podia zerar o
+  próprio bloqueio mandando tentativas com nomes inventados. A tabela
+  própria não descarta nada: as linhas vencidas são apagadas na criação da
+  linha seguinte. `test_muitas_chaves_inventadas_nao_apagam_o_contador_da_vitima`
+  cobre isso.
 
-**O limite que importa nessa escolha.** O cache em banco do Django tem um
-teto de entradas, e ao passar dele apaga um terço delas **por ordem
-alfabética da chave**, e não as mais antigas. O padrão é 300. Com esse
-valor, quem tenta senhas contra uma conta poderia zerar o próprio
-bloqueio mandando algumas centenas de tentativas com nomes de usuário
-inventados, porque cada nome cria uma entrada. O teste
-`test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio` demonstra o
-mecanismo com um limite baixo.
+A chave de cada contador é um hash (SHA-256), então nomes de usuário e
+endereços não ficam em claro na tabela e um nome de usuário gigante não
+quebra o campo. A janela é guardada em segundos desde 1970, o que a deixa
+independente de fuso.
 
-O teto de produção foi elevado a 100 mil entradas (`MAX_ENTRIES` em
-`config/settings.py`), e as entradas vencidas, de 15 minutos, saem antes
-e não contam para ele. Isso não elimina o problema, só o torna caro: um
-atacante ainda poderia zerar um contador disparando mais de 100 mil
-tentativas com nomes distintos dentro de 15 minutos, algo como 110
-requisições por segundo sustentadas.
+Foi escolhido em vez do Redis porque o banco já existe, e subir mais um
+serviço só para isso não se justificava no tamanho do projeto. O custo é uma
+ida ao banco por tentativa de login, aceitável para o volume do sistema.
 
 A defesa complementar é um limite de requisições por endereço no nginx. A
 configuração, com teste automatizado, está em `deploy/nginx/`, foi instalada
@@ -411,8 +410,8 @@ a decisão no banco.
 
 **Limite de e-mails.** O nginx limita por endereço. Quem usa muitos endereços
 ainda poderia encher a caixa de uma pessoa e gastar a cota diária de envios da
-conta. O limite por conta é de 3 e-mails por hora, contados no cache com
-janela fixa. Os pedidos além disso recebem a mesma resposta genérica de
+conta. O limite por conta é de 3 e-mails por hora, contados na mesma tabela
+de contadores, com janela fixa. Os pedidos além disso recebem a mesma resposta genérica de
 sempre, para não revelar que a conta existe, e vão para o log. O convite da
 gestão não entra nessa conta, porque é uma ação de um gestor autenticado, e
 não um pedido anônimo.

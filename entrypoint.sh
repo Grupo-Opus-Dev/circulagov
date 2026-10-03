@@ -24,11 +24,6 @@ echo "[entrypoint] banco respondendo"
 echo "[entrypoint] aplicando migracoes"
 python manage.py migrate --noinput
 
-# Tabela do cache usado pela protecao contra forca bruta. Nao e migracao,
-# entao precisa deste comando. Ele nao reclama se a tabela ja existe.
-echo "[entrypoint] garantindo a tabela de cache"
-python manage.py createcachetable
-
 echo "[entrypoint] coletando arquivos estaticos"
 python manage.py collectstatic --noinput --clear
 

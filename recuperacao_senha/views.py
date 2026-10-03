@@ -4,12 +4,13 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
+
+from usuarios import contadores
 
 from .models import MINUTOS_VALIDADE_TOKEN, TokenRecuperacaoSenha
 
@@ -31,13 +32,8 @@ SEGUNDOS_JANELA_EMAILS = 60 * 60
 def pode_enviar_email(usuario):
     """Conta um envio para essa conta e diz se ainda cabe. A janela de uma
     hora começa no primeiro envio e não anda com os pedidos recusados."""
-    chave = f'emails_recuperacao_{usuario.pk}'
-    cache.add(chave, 0, SEGUNDOS_JANELA_EMAILS)
-    try:
-        total = cache.incr(chave)
-    except ValueError:
-        cache.set(chave, 1, SEGUNDOS_JANELA_EMAILS)
-        return True
+    total = contadores.somar(
+        f'emails_recuperacao_{usuario.pk}', SEGUNDOS_JANELA_EMAILS)
     return total <= LIMITE_EMAILS_POR_HORA
 
 

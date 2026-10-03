@@ -152,24 +152,6 @@ if not DEBUG:
     # entao o valor nao vem do cliente. Ver docs/DEPLOY.md.
     CABECALHO_IP_DO_CLIENTE = 'HTTP_X_REAL_IP'
 
-    # Em producao o Gunicorn roda com varios workers, e cada processo
-    # teria o proprio contador em memoria: 5 tentativas viram 5 por
-    # worker. Guardar no banco mantem a contagem unica (requisito 1.11).
-    # A tabela e criada com: python manage.py createcachetable
-    #
-    # MAX_ENTRIES precisa ser alto. O padrao do Django e 300, e ao passar
-    # disso ele apaga um terco das entradas por ordem alfabetica da chave,
-    # e nao as mais antigas. Com 300, quem tenta senhas contra uma conta
-    # zera o proprio bloqueio mandando tentativas com nomes inventados.
-    # Entradas vencidas (15 min) saem antes e nao contam pro limite.
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': 'cache_bloqueio_login',
-            'OPTIONS': {'MAX_ENTRIES': 100_000},
-        }
-    }
-
 # E-mail de recuperação de senha (requisito 2.1).
 # Console backend: em vez de mandar e-mail de verdade, escreve no
 # terminal onde o servidor está rodando. Serve pra desenvolvimento e

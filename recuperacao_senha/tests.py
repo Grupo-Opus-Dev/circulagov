@@ -4,7 +4,6 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.core.cache import cache
 from django.db import connection
 from django.test import (
     Client, RequestFactory, TestCase, TransactionTestCase,
@@ -414,8 +413,6 @@ class TesteLimiteDeEmailsPorConta(TestCase):
     ainda poderia encher a caixa de alguém e gastar a cota de envios."""
 
     def setUp(self):
-        cache.clear()
-        self.addCleanup(cache.clear)
         self.usuario = Usuario.objects.create_user(
             username='alvo', password='SenhaAntiga@123',
             email='alvo@exemplo.com')

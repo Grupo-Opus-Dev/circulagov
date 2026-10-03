@@ -140,13 +140,20 @@ deixam de funcionar com os três workers do Gunicorn.
 | `test_quatro_processos_gravando_ao_mesmo_tempo` | `auditoria/tests.py` (`CadeiaComVariosProcessosTests`) | Quatro processos disputando o log não quebram a cadeia nem perdem linhas |
 | `test_handlers_alternando_no_mesmo_arquivo_mantem_a_cadeia` | `auditoria/tests.py` (`CadeiaComVariosProcessosTests`) | A cadeia vive no arquivo, não na memória de cada processo |
 | `test_ultima_linha_maior_que_o_bloco_de_leitura` | `auditoria/tests.py` (`CadeiaComVariosProcessosTests`) | Uma linha longa não é assinada em cima de uma leitura cortada |
-| `test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio` | `usuarios/tests.py` (`TesteDescarteDoCacheDeBloqueio`) | Demonstra o mecanismo: com limite baixo, tentativas com nomes inventados apagam o contador de uma conta |
-| `test_limite_folgado_preserva_o_contador` | `usuarios/tests.py` (`TesteDescarteDoCacheDeBloqueio`) | Com limite alto o contador sobrevive |
-| `test_configuracao_de_producao_tem_limite_folgado` | `usuarios/tests.py` (`TesteDescarteDoCacheDeBloqueio`) | Lê o settings de produção e garante que o limite não foi removido |
+| `test_falhas_simultaneas_sao_todas_contadas` | `usuarios/tests.py` (`TesteContadoresAtomicos`) | 8 threads somando ao mesmo tempo resultam em 8, não em menos. Falha sem o travamento da linha |
+| `test_registrar_falha_simultaneo_conta_par_e_conta` | idem | O contador do par e o da conta contam as 5 falhas simultâneas e o bloqueio arma |
+| `test_seis_tentativas_em_paralelo_nao_passam_do_limite_sem_bloquear` | idem | Tentativas simultâneas não deixam o bloqueio de login sem armar |
+| `test_falhas_do_2fa_simultaneas_armam_o_bloqueio` | idem | O mesmo vale para o limite do segundo fator |
+| `test_criacao_simultanea_da_mesma_chave_nao_derruba_nem_perde` | idem | Dez threads criando a mesma chave: nenhuma falha, nenhuma contagem perdida |
+| `test_janela_vencida_recomeca_do_um` | idem | Passada a janela, a contagem recomeça |
+| `test_chave_enorme_nao_derruba` | idem | Um nome de usuário gigante não quebra o contador |
+| `test_nome_de_usuario_nao_fica_em_claro_no_banco` | idem | A chave guardada é um hash |
+| `test_muitas_chaves_inventadas_nao_apagam_o_contador_da_vitima` | idem | Não existe descarte: 400 nomes inventados não apagam o contador de uma conta |
+| `test_entradas_vencidas_sao_limpas_ao_criar_nova` | idem | A tabela não cresce com linhas vencidas |
 
 Os dois defeitos foram encontrados depois do deploy. O primeiro apareceu na
 própria tela de integridade, que acusou "Log alterado" sem ninguém ter mexido
-no arquivo. O segundo, ao documentar o cache. O relato de cada um está em
+no arquivo. O segundo, ao documentar o cache (que depois foi substituído por uma tabela própria de contadores). O relato de cada um está em
 [INTEGRIDADE_LOGS.md](INTEGRIDADE_LOGS.md) e em
 [JUSTIFICATIVAS_TECNICAS.md](JUSTIFICATIVAS_TECNICAS.md), seção 5.
 

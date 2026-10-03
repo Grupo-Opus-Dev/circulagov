@@ -118,7 +118,7 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 ### 11. Zerar o bloqueio de login com nomes inventados
 
-**Descrição:** O contador de tentativas fica numa tabela de cache com teto de entradas. Passando do teto, parte dos contadores é descartada, e quem tenta senhas contra uma conta poderia apagar o próprio bloqueio disparando tentativas com nomes de usuário inventados.
+**Descrição:** O contador de tentativas ficava numa tabela de cache com teto de entradas. Passando do teto, parte dos contadores era descartada, e quem tentava senhas contra uma conta podia apagar o próprio bloqueio disparando tentativas com nomes de usuário inventados. Além disso, o incremento do cache em banco não é atômico, então tentativas simultâneas podiam ser contadas a menos.
 
 **Ativo afetado:** Credenciais e senhas dos usuários.
 
@@ -334,11 +334,11 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Risco resultante:** Alto
 
-**Contramedida implementada:** Teto de 100 mil entradas no cache em banco, e limite de requisições por endereço no login.
+**Contramedida implementada:** O contador passou a ser uma tabela própria do banco, sem descarte de entradas, com cada soma atômica (linha travada dentro de uma transação). Além disso, limite de requisições por endereço no login, no nginx.
 
-**Onde está no código:** `config/settings.py` e `deploy/nginx/circulagov-limites.conf`. O teste `test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio`, em `usuarios/tests.py`, demonstra o mecanismo.
+**Onde está no código:** `usuarios/contadores.py`, `usuarios/models.py` (`ContadorDeTentativas`) e `deploy/nginx/circulagov-limites.conf`. Os testes estão em `TesteContadoresAtomicos`, em `usuarios/tests.py`: contagem simultânea em threads (falha sem o travamento) e nomes inventados que não apagam o contador da vítima.
 
-**Risco residual:** Baixo. Seriam necessárias mais de 100 mil tentativas com nomes distintos em 15 minutos.
+**Risco residual:** Baixo. Não há mais descarte de contadores nem contagem perdida. Sobra a possibilidade de um atacante com muitos endereços manter o teto de 25 da conta atingido.
 
 ### 12. Abuso do e-mail de recuperação de senha
 
