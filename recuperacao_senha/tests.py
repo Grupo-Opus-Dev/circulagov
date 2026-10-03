@@ -254,3 +254,52 @@ class TesteMensagemGenericaDeFalha(TestCase):
         self.assertEqual(status_inexistente, 400)
         self.assertEqual(corpo_expirado, corpo_usado)
         self.assertEqual(corpo_usado, corpo_inexistente)
+
+
+class TesteValidadoresNaRedefinicao(TestCase):
+    """A redefinição aceitava qualquer senha, até "1", porque só conferia
+    se as duas digitadas batiam. Os validadores do projeto valiam no
+    cadastro e na troca de senha, mas não por este caminho."""
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='usuario_teste', password='SenhaAntiga@123')
+        self.registro, valor_bruto = TokenRecuperacaoSenha.gerar(self.usuario)
+        self.url = reverse('recuperacao_senha:redefinir', args=[valor_bruto])
+
+    def test_senha_curta_e_recusada(self):
+        self.client.post(self.url, {'senha_nova': '1', 'confirmacao': '1'})
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('SenhaAntiga@123'))
+
+    def test_senha_comum_e_recusada(self):
+        self.client.post(
+            self.url, {'senha_nova': 'password', 'confirmacao': 'password'})
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('SenhaAntiga@123'))
+
+    def test_senha_so_numerica_e_recusada(self):
+        self.client.post(
+            self.url, {'senha_nova': '83920175', 'confirmacao': '83920175'})
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('SenhaAntiga@123'))
+
+    def test_senha_recusada_nao_queima_o_token(self):
+        """Errar a senha não pode obrigar a pessoa a pedir outro link."""
+        self.client.post(self.url, {'senha_nova': '1', 'confirmacao': '1'})
+        self.registro.refresh_from_db()
+        self.assertIsNone(self.registro.usado_em)
+
+    def test_motivo_da_recusa_aparece_na_tela(self):
+        resposta = self.client.post(
+            self.url, {'senha_nova': '1', 'confirmacao': '1'})
+        mensagens = [m.message for m in resposta.context['messages']]
+        self.assertTrue(any('8 caracteres' in m for m in mensagens))
+
+    def test_recusa_vai_pro_log_sem_a_senha(self):
+        with self.assertLogs('seguranca.recuperacao_senha', level='INFO') as registro:
+            self.client.post(
+                self.url, {'senha_nova': 'Fraca1', 'confirmacao': 'Fraca1'})
+        texto = chr(10).join(registro.output)
+        self.assertIn('senha_recusada_pelos_validadores', texto)
+        self.assertNotIn('Fraca1', texto)

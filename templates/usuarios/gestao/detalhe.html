@@ -39,6 +39,16 @@
       </dd>
     </div>
     <div class="flex justify-between px-4 py-2.5">
+      <dt class="text-slate-500">Senha</dt>
+      <dd class="text-slate-800">
+        {% if usuario_exibido.has_usable_password %}
+          definida
+        {% else %}
+          <span class="text-amber-700">aguardando a pessoa criar pelo link</span>
+        {% endif %}
+      </dd>
+    </div>
+    <div class="flex justify-between px-4 py-2.5">
       <dt class="text-slate-500">Cadastrado em</dt>
       <dd class="text-slate-800">{{ usuario_exibido.date_joined|date:"d/m/Y H:i" }}</dd>
     </div>

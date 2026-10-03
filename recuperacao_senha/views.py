@@ -3,6 +3,8 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -41,18 +43,43 @@ def solicitar(request):
     return render(request, 'recuperacao_senha/solicitar.html')
 
 
-def enviar_email_recuperacao(request, usuario):
+def enviar_email_recuperacao(request, usuario, nova_conta=False):
+    """Manda o link de definição de senha.
+
+    Serve a dois casos: quem esqueceu a senha, e quem acabou de ter a
+    conta criada pela gestão e ainda não tem senha nenhuma. O link e o
+    token são os mesmos, só o texto muda.
+    """
     registro, valor_bruto = TokenRecuperacaoSenha.gerar(usuario)
     link = request.build_absolute_uri(
         reverse('recuperacao_senha:redefinir', args=[valor_bruto])
     )
-    send_mail(
-        subject='CirculaGov: recuperação de senha',
-        message=(
+
+    if nova_conta:
+        assunto = 'CirculaGov: sua conta foi criada'
+        abertura = (
             f'Olá, {usuario.get_username()}.\n\n'
-            f'Use o link abaixo para redefinir sua senha. '
-            f'Ele vale por {MINUTOS_VALIDADE_TOKEN} minutos '
-            f'e só pode ser usado uma vez.\n\n{link}'
+            f'Uma conta no CirculaGov foi criada para você, com o usuário '
+            f'"{usuario.get_username()}". Use o link abaixo para criar a '
+            f'sua senha.'
+        )
+        fechamento = (
+            '\n\nSe o link expirar, use "Esqueci minha senha" na tela de '
+            'login, informando o seu usuário.'
+        )
+    else:
+        assunto = 'CirculaGov: recuperação de senha'
+        abertura = (
+            f'Olá, {usuario.get_username()}.\n\n'
+            f'Use o link abaixo para redefinir sua senha.'
+        )
+        fechamento = ''
+
+    send_mail(
+        subject=assunto,
+        message=(
+            f'{abertura} Ele vale por {MINUTOS_VALIDADE_TOKEN} minutos '
+            f'e só pode ser usado uma vez.\n\n{link}{fechamento}'
         ),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[usuario.email or f'{usuario.username}@exemplo.local'],
@@ -83,6 +110,20 @@ def redefinir(request, token):
                 registro.usuario.get_username(),
             )
             messages.error(request, 'As senhas digitadas não conferem.')
+            return render(request, 'recuperacao_senha/redefinir.html', {'token': token})
+
+        # Sem isto, a recuperacao aceitava qualquer senha, ate "1", porque
+        # so conferia se as duas digitadas batiam. Os validadores valiam
+        # no cadastro e na troca de senha, mas nao aqui.
+        try:
+            validate_password(senha_nova, registro.usuario)
+        except ValidationError as erros:
+            logger.info(
+                'falha na recuperacao de senha, motivo=senha_recusada_pelos_validadores, username=%s',
+                registro.usuario.get_username(),
+            )
+            for erro in erros.messages:
+                messages.error(request, erro)
             return render(request, 'recuperacao_senha/redefinir.html', {'token': token})
 
         registro.usuario.set_password(senha_nova)

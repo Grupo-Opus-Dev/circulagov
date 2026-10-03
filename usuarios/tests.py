@@ -315,6 +315,7 @@ class TesteCriacaoDeUsuario(TestCase):
         self.dados = {
             'username': 'novo_aluno',
             'email': 'novo@escola.test',
+            'usable_password': 'true',
             'password1': 'SenhaForte!2026',
             'password2': 'SenhaForte!2026',
         }
@@ -545,3 +546,105 @@ class TesteTelaDeAuditoriaUsaOLoginDaAplicacao(TestCase):
         self.client.login(username='comum', password='SenhaDeTeste123')
         self.assertEqual(
             self.client.get(reverse('auditoria:integridade')).status_code, 403)
+
+
+class TesteCadastroComLinkDeSenha(TestCase):
+    """No modo padrão a conta nasce sem senha utilizável e a pessoa
+    recebe um link para criar a própria. Quem cadastra nunca conhece
+    senha nenhuma."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        Usuario.objects.create_user(
+            username='gestor', password=self.senha, is_staff=True)
+        self.client.login(username='gestor', password=self.senha)
+        self.dados = {
+            'username': 'convidado',
+            'email': 'convidado@escola.test',
+            'usable_password': 'false',
+        }
+
+    def test_conta_nasce_sem_senha_utilizavel(self):
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        criado = Usuario.objects.get(username='convidado')
+        self.assertFalse(criado.has_usable_password())
+
+    def test_nao_exige_digitar_senha(self):
+        resposta = self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        self.assertEqual(resposta.status_code, 302)
+        self.assertTrue(Usuario.objects.filter(username='convidado').exists())
+
+    def test_senha_digitada_e_ignorada_no_modo_de_link(self):
+        """Se alguém preencher os campos e escolher o link, vale o link."""
+        dados = self.dados | {
+            'password1': 'IgnoradaAqui!2026', 'password2': 'IgnoradaAqui!2026'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        criado = Usuario.objects.get(username='convidado')
+        self.assertFalse(criado.has_usable_password())
+
+    def test_envia_o_email_de_conta_criada(self):
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['convidado@escola.test'])
+        self.assertIn('sua conta foi criada', mail.outbox[0].subject)
+        self.assertIn('convidado', mail.outbox[0].body)
+
+    def test_nao_entra_antes_de_criar_a_senha(self):
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        outro = Client()
+        self.assertFalse(outro.login(username='convidado', password=''))
+
+    def test_fluxo_completo_do_convite_ate_o_login(self):
+        """Cadastro, e-mail, link, senha nova e login. Ponta a ponta."""
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+
+        corpo = mail.outbox[0].body
+        caminho = corpo[corpo.index('/recuperar-senha/redefinir/'):].split()[0]
+
+        pessoa = Client()
+        pessoa.post(caminho, {
+            'senha_nova': 'MinhaPropria!2026', 'confirmacao': 'MinhaPropria!2026'})
+
+        self.assertTrue(
+            pessoa.login(username='convidado', password='MinhaPropria!2026'))
+
+    def test_criacao_por_link_fica_registrada_no_log(self):
+        with self.assertLogs('seguranca.gestao', level='INFO') as registro:
+            self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        self.assertIn('senha=por_link', chr(10).join(registro.output))
+
+    def test_perfil_mostra_que_aguarda_a_senha(self):
+        self.client.post(reverse('usuarios:gestao_novo'), self.dados)
+        criado = Usuario.objects.get(username='convidado')
+        resposta = self.client.get(
+            reverse('usuarios:gestao_detalhe', args=[criado.id]))
+        self.assertContains(resposta, 'aguardando a pessoa criar pelo link')
+
+    def test_falha_no_email_nao_esconde_o_problema(self):
+        """A conta fica criada, mas a tela avisa que o e-mail falhou."""
+        from unittest import mock
+        from smtplib import SMTPException
+
+        with mock.patch(
+                'usuarios.views_gestao.enviar_email_recuperacao',
+                side_effect=SMTPException('servidor fora')):
+            resposta = self.client.post(
+                reverse('usuarios:gestao_novo'), self.dados, follow=True)
+
+        self.assertTrue(Usuario.objects.filter(username='convidado').exists())
+        mensagens = [m.message for m in resposta.context['messages']]
+        self.assertTrue(any('não pôde ser enviado' in m for m in mensagens))
+
+    def test_modo_definir_agora_continua_exigindo_senha(self):
+        dados = self.dados | {'usable_password': 'true'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        self.assertFalse(Usuario.objects.filter(username='convidado').exists())
+
+    def test_modo_definir_agora_nao_manda_email(self):
+        dados = self.dados | {
+            'usable_password': 'true',
+            'password1': 'SenhaForte!2026', 'password2': 'SenhaForte!2026'}
+        self.client.post(reverse('usuarios:gestao_novo'), dados)
+        self.assertEqual(len(mail.outbox), 0)
+        criado = Usuario.objects.get(username='convidado')
+        self.assertTrue(criado.check_password('SenhaForte!2026'))

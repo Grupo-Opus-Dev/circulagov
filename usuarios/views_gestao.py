@@ -10,6 +10,7 @@ porque mexer em conta alheia muda quem tem acesso ao sistema.
 """
 
 import logging
+from smtplib import SMTPException
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
@@ -18,6 +19,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from recuperacao_senha.models import MINUTOS_VALIDADE_TOKEN
 from recuperacao_senha.views import enviar_email_recuperacao
 
 from .decoradores import exige_gestor
@@ -70,13 +72,40 @@ def novo_usuario(request):
         formulario = FormularioNovoUsuario(request.POST)
         if formulario.is_valid():
             criado = formulario.save()
+            com_link = not criado.has_usable_password()
             logger.info(
-                'usuario criado, username=%s, is_staff=%s, criado_por=%s',
+                'usuario criado, username=%s, is_staff=%s, senha=%s, criado_por=%s',
                 criado.get_username(), criado.is_staff,
+                'por_link' if com_link else 'definida_pelo_gestor',
                 request.user.get_username(),
             )
-            messages.success(
-                request, f'Usuário {criado.get_username()} criado.')
+
+            if not com_link:
+                messages.success(
+                    request, f'Usuário {criado.get_username()} criado.')
+            else:
+                # A conta já existe mesmo se o e-mail falhar. Nesse caso
+                # avisa e aponta o botão de reenviar, em vez de deixar
+                # parecer que deu tudo certo.
+                try:
+                    enviar_email_recuperacao(request, criado, nova_conta=True)
+                except (SMTPException, OSError):
+                    logger.error(
+                        'falha ao enviar link de nova conta, username=%s',
+                        criado.get_username(),
+                    )
+                    messages.error(
+                        request,
+                        f'Usuário {criado.get_username()} criado, mas o e-mail '
+                        'não pôde ser enviado. Use "Enviar link de redefinição" '
+                        'abaixo para tentar de novo.')
+                else:
+                    messages.success(
+                        request,
+                        f'Usuário {criado.get_username()} criado. Link para '
+                        f'criar a senha enviado para {criado.email}, válido '
+                        f'por {MINUTOS_VALIDADE_TOKEN} minutos.')
+
             return redirect('usuarios:gestao_detalhe', usuario_id=criado.pk)
     else:
         formulario = FormularioNovoUsuario()
