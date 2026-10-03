@@ -132,6 +132,14 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Indisponibilidade da recuperação de senha e incômodo ao titular da conta.
 
+### 13. Contorno do segundo fator pelo admin do Django
+
+**Descrição:** O admin do Django tem login próprio, que não passava pelo segundo fator nem pelo bloqueio por tentativas. Quem soubesse a senha de uma conta de gestão entrava no `/admin/` sem o código, e podia tentar senhas sem limite.
+
+**Ativo afetado:** Contas de gestão e o painel administrativo.
+
+**Impacto:** Acesso administrativo sem o segundo fator, anulando a proteção que o 2FA deveria dar justamente às contas mais poderosas.
+
 ### Lacunas identificadas
 
 Além das ameaças já consideradas pelo projeto, outras ameaças podem ser identificadas durante a análise. Quando uma ameaça ainda não possui uma proteção implementada, ela deve ser registrada como uma lacuna de segurança para avaliação posterior.
@@ -313,3 +321,17 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 **Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
 
 **Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.
+
+### 13. Contorno do segundo fator pelo admin do Django
+
+**Probabilidade:** Média
+
+**Impacto:** Alta
+
+**Risco resultante:** Alto
+
+**Contramedida implementada:** O `/admin/login/` deixou de autenticar e só redireciona para o login da aplicação. O admin aceita a sessão que sai de lá, e assim herda o segundo fator e o bloqueio por tentativas.
+
+**Onde está no código:** `usuarios/admin_site.py`, `usuarios/admin_config.py` e `config/settings.py`. A classe `TesteAdminUsaOLoginDaAplicacao`, em `usuarios/tests.py`, cobre o caso, e quatro de seus testes falham contra o admin antigo.
+
+**Risco residual:** Baixo para quem ativou o 2FA. O 2FA continua opcional, então uma conta de gestão que nunca o ativou ainda entra só com a senha.
