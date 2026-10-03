@@ -90,3 +90,15 @@ class TokenRecuperacaoSenha(models.Model):
         senha nova já foi salva com sucesso."""
         self.usado_em = timezone.now()
         self.save(update_fields=['usado_em'])
+
+    def consumir(self):
+        """Marca o token como usado de forma atômica e diz se coube a quem
+        chamou usá-lo. O UPDATE condicional é decidido pelo banco: de dois
+        pedidos simultâneos com o mesmo token, só um altera uma linha.
+        Conferir o token e marcá-lo em passos separados deixava os dois
+        passarem."""
+        agora = timezone.now()
+        alteradas = type(self).objects.filter(
+            pk=self.pk, usado_em__isnull=True, expira_em__gte=agora,
+        ).update(usado_em=agora)
+        return alteradas == 1

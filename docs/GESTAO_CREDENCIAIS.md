@@ -64,7 +64,7 @@ reconstruir o valor original a partir do hash.
 
 **Morre:** o registro expira em 30 minutos (`MINUTOS_VALIDADE_TOKEN`,
 contados a partir de `criado_em`) ou fica inválido assim que é usado
-uma vez (`marcar_usado`, que preenche `usado_em`), o que ocorrer
+uma vez (`consumir`, que preenche `usado_em`), o que ocorrer
 primeiro. Não há limpeza automática: o registro continua na tabela
 depois de expirado ou usado, só deixa de validar.
 

@@ -4,8 +4,10 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
@@ -18,6 +20,25 @@ logger = logging.getLogger('seguranca.recuperacao_senha')
 MENSAGEM_GENERICA = (
     'Se o usuário existir, enviamos um e-mail com instruções de recuperação.'
 )
+
+# Limite de e-mails de recuperação por conta. O limite do nginx é por
+# endereço, e quem usa vários endereços ainda encheria a caixa de uma
+# pessoa e gastaria a cota diária de envios da conta de e-mail.
+LIMITE_EMAILS_POR_HORA = 3
+SEGUNDOS_JANELA_EMAILS = 60 * 60
+
+
+def pode_enviar_email(usuario):
+    """Conta um envio para essa conta e diz se ainda cabe. A janela de uma
+    hora começa no primeiro envio e não anda com os pedidos recusados."""
+    chave = f'emails_recuperacao_{usuario.pk}'
+    cache.add(chave, 0, SEGUNDOS_JANELA_EMAILS)
+    try:
+        total = cache.incr(chave)
+    except ValueError:
+        cache.set(chave, 1, SEGUNDOS_JANELA_EMAILS)
+        return True
+    return total <= LIMITE_EMAILS_POR_HORA
 
 
 def solicitar(request):
@@ -32,7 +53,13 @@ def solicitar(request):
         usuario = Usuario.objects.filter(username=nome_usuario).first()
 
         if usuario is not None:
-            enviar_email_recuperacao(request, usuario)
+            if pode_enviar_email(usuario):
+                enviar_email_recuperacao(request, usuario)
+            else:
+                # A resposta continua a mesma, pra nao revelar que a conta existe.
+                logger.warning(
+                    'limite de e-mails de recuperacao atingido, username=%s',
+                    usuario.get_username())
 
         # Registra a solicitacao de recuperacao (issue #30), independente do usuario existir.
         logger.info('solicitacao de recuperacao de senha para username=%s', nome_usuario)
@@ -126,9 +153,18 @@ def redefinir(request, token):
                 messages.error(request, erro)
             return render(request, 'recuperacao_senha/redefinir.html', {'token': token})
 
-        registro.usuario.set_password(senha_nova)
-        registro.usuario.save()
-        registro.marcar_usado()
+        # Consumir o token e trocar a senha formam uma unidade. O token e
+        # consumido primeiro, e o UPDATE condicional garante que so um dos
+        # pedidos simultaneos com o mesmo link siga adiante. Se a troca da
+        # senha falhar, o token volta a valer junto.
+        with transaction.atomic():
+            if not registro.consumir():
+                logger.warning(
+                    'falha na recuperacao de senha, motivo=token_ja_usado')
+                return render(
+                    request, 'recuperacao_senha/token_invalido.html', status=400)
+            registro.usuario.set_password(senha_nova)
+            registro.usuario.save(update_fields=['password'])
 
         # Recuperacao concluida com sucesso (issue #31).
         logger.info('recuperacao de senha concluida com sucesso, username=%s', registro.usuario.get_username())

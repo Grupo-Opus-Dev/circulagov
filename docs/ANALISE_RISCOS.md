@@ -148,13 +148,20 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Negação de acesso a uma conta específica, sem precisar da senha.
 
+### 15. Uso duplo do link de recuperação
+
+**Descrição:** A recuperação conferia se o token era válido e só depois o marcava como usado, em passos separados e sem transação. Dois pedidos simultâneos com o mesmo link passavam os dois pela conferência, e o link de uso único servia duas vezes. Se a gravação da senha falhasse no meio, o estado também ficava inconsistente.
+
+**Ativo afetado:** Tokens de recuperação e senhas.
+
+**Impacto:** Quem interceptasse um link poderia usá-lo ao mesmo tempo que o dono, e o requisito de uso único deixava de valer.
+
 ### Lacunas identificadas
 
 Além das ameaças já consideradas pelo projeto, outras ameaças podem ser identificadas durante a análise. Quando uma ameaça ainda não possui uma proteção implementada, ela deve ser registrada como uma lacuna de segurança para avaliação posterior.
 
 Lacunas conhecidas hoje:
 
-- o pedido de recuperação de senha não tem trava de tentativas por conta no código (ameaça 12)
 - o limite de requisições por endereço não barra um ataque distribuído por muitos endereços
 - não há backup do banco nem do log de segurança
 
@@ -324,9 +331,9 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Risco resultante:** Médio
 
-**Contramedida implementada:** Limite de requisições por endereço no pedido de recuperação, 3 por minuto, no nginx.
+**Contramedida implementada:** Na aplicação, no máximo 3 e-mails de recuperação por conta por hora; os pedidos além disso recebem a mesma resposta de sempre, sem e-mail e com registro no log. Além disso, limite de requisições por endereço no pedido de recuperação, 3 por minuto, no nginx.
 
-**Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
+**Onde está no código:** `recuperacao_senha/views.py` (`pode_enviar_email`) e `deploy/nginx/circulagov-limites.conf`. Os testes estão em `TesteLimiteDeEmailsPorConta`, em `recuperacao_senha/tests.py`.
 
 **Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.
 
@@ -348,6 +355,12 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Probabilidade:** Média
 
+**Risco residual:** Baixo. No máximo 72 e-mails por dia para uma conta, bem abaixo da cota diária de envios. Quem quiser ainda pode gastar esses 3 por hora contra uma conta, e a pessoa recebe esses e-mails.
+
+### 15. Uso duplo do link de recuperação
+
+**Probabilidade:** Baixa
+
 **Impacto:** Média
 
 **Risco resultante:** Médio
@@ -357,3 +370,9 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 **Onde está no código:** `usuarios/seguranca.py`, `usuarios/views.py` e `CABECALHO_IP_DO_CLIENTE` em `config/settings.py`. Os testes estão em `TesteBloqueioDeLoginPorEndereco`, em `usuarios/tests.py`.
 
 **Risco residual:** Médio-baixo. Um atacante com muitos endereços ainda pode manter o teto de 25 da conta atingido e trancar a vítima. O limite protege a conta contra adivinhação, e o custo é essa indisponibilidade temporária.
+
+**Contramedida implementada:** O token é consumido por um UPDATE condicional (`consumir`), decidido pelo banco, dentro de uma transação junto com a troca da senha. De dois pedidos simultâneos, só um segue; se a gravação da senha falhar, o token volta a valer.
+
+**Onde está no código:** `recuperacao_senha/models.py` (`consumir`) e `recuperacao_senha/views.py`. O teste `test_dois_pedidos_pelo_mesmo_link_so_um_troca_a_senha`, em `TesteUsoSimultaneoDoToken`, falha com o código antigo.
+
+**Risco residual:** Baixo.
