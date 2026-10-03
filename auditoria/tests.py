@@ -1,17 +1,19 @@
 import base64
 import logging
+import re
 import subprocess
 import sys
 import tempfile
 import time
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from .integridade import HandlerLogIntegro, verificar_arquivo
@@ -353,3 +355,196 @@ class CadeiaComVariosProcessosTests(SimpleTestCase):
         self.assertTrue(Path(f'{self.caminho}.lock').exists())
         resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
         self.assertEqual(resultado.total_linhas, 1)
+
+
+def gravar_como_em_producao(caminho, eventos, chave=CHAVE_TESTE):
+    """Grava no formato real de LOGGING, com data, nivel e origem.
+
+    Cria o registro e entrega direto ao handler, em vez de passar pelo
+    logger "seguranca", que tambem escreveria no log de verdade.
+    """
+    handler = HandlerLogIntegro(caminho, chave)
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s %(name)s %(message)s'))
+    for origem, nivel, mensagem in eventos:
+        registro = logging.LogRecord(
+            name=f'seguranca.{origem}', level=getattr(logging, nivel),
+            pathname='', lineno=0, msg=mensagem, args=(), exc_info=None)
+        handler.handle(registro)
+    handler.close()
+
+
+class ListaDeEventosTests(TestCase):
+    """Os logs de autenticação, de falha e de 2FA (5.1 e 5.2) precisam
+    poder ser vistos pelo front-end, e não só abrindo o arquivo."""
+
+    def setUp(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.caminho = Path(self.pasta.name) / 'seguranca.log'
+        self.override = override_settings(
+            LOG_DIR=Path(self.pasta.name), CHAVE_INTEGRIDADE_LOGS=CHAVE_TESTE)
+        self.override.enable()
+        self.url = reverse('auditoria:eventos')
+        Usuario.objects.create_user(
+            username='gestor', password='Senha@12345', is_staff=True)
+        self.client.login(username='gestor', password='Senha@12345')
+
+    def tearDown(self):
+        self.override.disable()
+        self.pasta.cleanup()
+
+    def test_sem_login_vai_pro_login_da_aplicacao(self):
+        resposta = Client().get(self.url)
+        self.assertEqual(resposta.status_code, 302)
+        self.assertTrue(resposta.url.startswith('/contas/login/'))
+
+    def test_usuario_comum_recebe_403(self):
+        Usuario.objects.create_user(username='comum', password='Senha@12345')
+        comum = Client()
+        comum.login(username='comum', password='Senha@12345')
+        self.assertEqual(comum.get(self.url).status_code, 403)
+
+    def test_mostra_os_eventos_do_arquivo(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'login com sucesso, username=ana'),
+            ('autenticacao', 'WARNING', 'tentativa de login com falha, username=bruno'),
+            ('dois_fatores', 'INFO', 'codigo 2FA correto, username=ana'),
+        ])
+        resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'login com sucesso, username=ana')
+        self.assertContains(resposta, 'tentativa de login com falha, username=bruno')
+        self.assertContains(resposta, 'codigo 2FA correto')
+        self.assertContains(resposta, 'Dois fatores')
+
+    def test_mais_recente_primeiro(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'primeiro evento'),
+            ('autenticacao', 'INFO', 'segundo evento'),
+            ('autenticacao', 'INFO', 'terceiro evento'),
+        ])
+        corpo = self.client.get(self.url).content.decode()
+        self.assertLess(corpo.index('terceiro evento'), corpo.index('segundo evento'))
+        self.assertLess(corpo.index('segundo evento'), corpo.index('primeiro evento'))
+
+    def test_filtra_por_origem(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'evento de autenticacao'),
+            ('dois_fatores', 'INFO', 'evento de dois fatores'),
+        ])
+        resposta = self.client.get(self.url, {'categoria': 'dois_fatores'})
+        self.assertContains(resposta, 'evento de dois fatores')
+        self.assertNotContains(resposta, 'evento de autenticacao')
+
+    def test_filtra_por_nivel(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'tudo bem'),
+            ('autenticacao', 'WARNING', 'algo suspeito'),
+        ])
+        resposta = self.client.get(self.url, {'nivel': 'WARNING'})
+        self.assertContains(resposta, 'algo suspeito')
+        self.assertNotContains(resposta, 'tudo bem')
+
+    def test_busca_por_usuario(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'login com sucesso, username=ana'),
+            ('autenticacao', 'INFO', 'login com sucesso, username=bruno'),
+        ])
+        resposta = self.client.get(self.url, {'busca': 'BRUNO'})
+        self.assertContains(resposta, 'username=bruno')
+        self.assertNotContains(resposta, 'username=ana')
+
+    def test_filtro_inventado_na_url_nao_derruba_a_pagina(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'um evento')])
+        resposta = self.client.get(
+            self.url, {'categoria': 'nao_existe', 'nivel': 'XPTO', 'page': 'abc'})
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'um evento')
+
+    def test_html_digitado_pelo_usuario_nao_e_executado(self):
+        """O nome de usuário de uma tentativa falha vem do formulário de
+        login, aberto a qualquer um. Aparece na tela do administrador, e
+        não pode virar script."""
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'WARNING',
+             'tentativa de login com falha, username=<script>alert(1)</script>'),
+        ])
+        resposta = self.client.get(self.url)
+        self.assertNotContains(resposta, '<script>alert(1)</script>')
+        self.assertContains(resposta, '&lt;script&gt;alert(1)&lt;/script&gt;')
+
+    def test_cadeia_integra_marca_todas_as_linhas(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'um'), ('autenticacao', 'INFO', 'dois')])
+        resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'Cadeia íntegra')
+        self.assertNotContains(resposta, 'depois da quebra')
+
+    def test_log_adulterado_aparece_na_lista_e_marca_o_que_vem_depois(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'evento 1 evento'),
+            ('autenticacao', 'INFO', 'evento 2 evento'),
+            ('autenticacao', 'INFO', 'evento 3 evento'),
+        ])
+        linhas = self.caminho.read_text(encoding='utf-8').splitlines()
+        linhas[1] = linhas[1].replace('evento 2', 'EVENTO 2')
+        self.caminho.write_text('\n'.join(linhas) + '\n', encoding='utf-8')
+
+        resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'Cadeia quebrada na linha 2')
+        # A linha 1 continua confirmada. A 2 e a 3 nao.
+        self.assertContains(resposta, 'Linha 1: confirmada pela cadeia')
+        self.assertContains(resposta, 'Linha 2: depois da quebra')
+        self.assertContains(resposta, 'Linha 3: depois da quebra')
+
+    def test_linha_fora_do_formato_aparece_em_vez_de_sumir(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', 'normal')])
+        with self.caminho.open('a', encoding='utf-8') as arquivo:
+            arquivo.write('texto solto sem formato nenhum\n')
+        resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'texto solto sem formato nenhum')
+        self.assertContains(resposta, 'formato desconhecido')
+
+    def test_sem_arquivo_de_log_mostra_aviso_em_vez_de_erro(self):
+        resposta = self.client.get(self.url)
+        self.assertEqual(resposta.status_code, 200)
+        self.assertContains(resposta, 'Nenhum evento registrado ainda')
+
+    def test_pagina_os_eventos_e_mantem_os_filtros_nos_links(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', f'evento numero {i:03d}') for i in range(120)
+        ])
+        primeira = self.client.get(self.url, {'categoria': 'autenticacao'})
+        self.assertEqual(len(primeira.context['pagina']), 50)
+        # O link da proxima pagina nao pode perder o filtro.
+        self.assertContains(primeira, 'categoria=autenticacao&amp;page=2')
+
+        ultima = self.client.get(self.url, {'page': 3})
+        self.assertEqual(len(ultima.context['pagina']), 20)
+        self.assertContains(ultima, 'evento numero 000')
+
+    def test_aviso_quando_o_arquivo_e_maior_que_o_limite_lido(self):
+        gravar_como_em_producao(self.caminho, [
+            ('autenticacao', 'INFO', f'evento {i}') for i in range(12)
+        ])
+        with mock.patch('auditoria.views.LIMITE_DE_LINHAS', 5):
+            resposta = self.client.get(self.url)
+        self.assertContains(resposta, 'Estão sendo lidas as últimas 5')
+        self.assertEqual(resposta.context['lidos'], 5)
+
+
+class TesteComentariosDeTemplate(SimpleTestCase):
+    """O {# #} do Django so vale numa linha. Escrito em varias, o texto
+    inteiro aparece na pagina, e ja aconteceu duas vezes. Comentario
+    longo precisa de {% comment %}."""
+
+    def test_nenhum_comentario_de_chaves_ocupa_mais_de_uma_linha(self):
+        padrao = re.compile(r'\{#(?:(?!#\}).)*?\n(?:(?!#\}).)*?#\}', re.S)
+        com_problema = []
+        for caminho in Path(settings.BASE_DIR, 'templates').rglob('*.html'):
+            texto = caminho.read_text(encoding='utf-8')
+            for achado in padrao.finditer(texto):
+                linha = texto.count('\n', 0, achado.start()) + 1
+                com_problema.append(f'{caminho.name}:{linha}')
+        self.assertEqual(com_problema, [])

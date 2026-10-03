@@ -114,8 +114,8 @@ na própria tela, que separa ativos de revogados.
 
 | Item | Onde testar |
 |---|---|
-| 5.1 e 5.2 Logs de autenticação, falhas e 2FA | [LOGS_AUTENTICACAO.md](LOGS_AUTENTICACAO.md) e `docs/evidencias/` |
-| 5.3 Proteção contra alteração | **`/auditoria/integridade/`**, com a conta `professor` |
+| 5.1 e 5.2 Logs de autenticação, falhas e 2FA | **`/auditoria/eventos/`**, com a conta `professor`. Gere os eventos antes: entre e saia da conta, erre a senha de propósito, ative o 2FA e erre um código. Depois filtre por origem e por nível, ou busque pelo nome do usuário. Os formatos e o que cada evento significa estão em [LOGS_AUTENTICACAO.md](LOGS_AUTENTICACAO.md) |
+| 5.3 Proteção contra alteração | **`/auditoria/integridade/`**, com a conta `professor`. A lista de eventos também mostra, em cada linha, se ela está antes de alguma quebra da cadeia |
 | 5.4 Exemplo de análise | [ANALISE_LOGS.md](ANALISE_LOGS.md) |
 
 A tela de integridade mostra quantas linhas foram verificadas e o último MAC
