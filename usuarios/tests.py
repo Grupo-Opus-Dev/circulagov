@@ -727,6 +727,73 @@ class TesteDescarteDoCacheDeBloqueio(TestCase):
         self.assertGreaterEqual(int(resultado.stdout.strip()), 50_000)
 
 
+class TesteAdminUsaOLoginDaAplicacao(TestCase):
+    """O login do admin do Django não passava pelo segundo fator nem pelo
+    bloqueio de tentativas. Quem tinha a senha de uma conta de gestão
+    entrava no /admin/ sem o código, mesmo com o 2FA ativo."""
+
+    def setUp(self):
+        self.senha = 'SenhaDeTeste123'
+        self.gestor = Usuario.objects.create_user(
+            username='gestor2fa', password=self.senha, email='g@x.test',
+            is_staff=True, is_superuser=True)
+        self.dispositivo = DispositivoTOTP.objects.create(
+            usuario=self.gestor, confirmado=True)
+
+    def test_post_no_login_do_admin_nao_autentica_ninguem(self):
+        c = Client()
+        resposta = c.post('/admin/login/', {
+            'username': 'gestor2fa', 'password': self.senha, 'next': '/admin/'})
+        self.assertEqual(resposta.status_code, 302)
+        self.assertTrue(resposta.url.startswith('/contas/login/'))
+        # A senha certa mandada pro admin não abriu nada.
+        self.assertEqual(c.get('/admin/').status_code, 302)
+
+    def test_senha_certa_no_login_da_aplicacao_ainda_nao_abre_o_admin(self):
+        c = Client()
+        c.post(reverse('login'), {'username': 'gestor2fa', 'password': self.senha})
+        self.assertEqual(c.get('/admin/').status_code, 302)
+
+    def test_depois_do_segundo_fator_o_admin_abre(self):
+        c = Client()
+        c.post(reverse('login'), {'username': 'gestor2fa', 'password': self.senha})
+        c.post(reverse('dois_fatores:verificar'),
+               {'codigo': self.dispositivo.totp().now()})
+        self.assertEqual(c.get('/admin/').status_code, 200)
+
+    def test_gestor_sem_2fa_entra_pelo_login_da_aplicacao(self):
+        Usuario.objects.create_user(
+            username='gestor_sem_2fa', password=self.senha, email='h@x.test',
+            is_staff=True)
+        c = Client()
+        c.post(reverse('login'), {'username': 'gestor_sem_2fa', 'password': self.senha})
+        self.assertEqual(c.get('/admin/').status_code, 200)
+
+    def test_admin_sem_login_leva_ao_login_da_aplicacao(self):
+        resposta = Client().get('/admin/', follow=True)
+        destino = resposta.redirect_chain[-1][0]
+        self.assertTrue(destino.startswith('/contas/login/'), destino)
+        self.assertIn('next=/admin/', destino)
+
+    def test_usuario_comum_logado_recebe_403(self):
+        Usuario.objects.create_user(username='comum_admin', password=self.senha)
+        c = Client()
+        c.post(reverse('login'), {'username': 'comum_admin', 'password': self.senha})
+        self.assertEqual(c.get('/admin/', follow=True).status_code, 403)
+
+    def test_next_apontando_pra_site_externo_e_ignorado(self):
+        resposta = Client().get('/admin/login/?next=https://site-malicioso.test/')
+        self.assertEqual(resposta.status_code, 302)
+        self.assertNotIn('site-malicioso', resposta.url)
+        self.assertIn('next=/admin/', resposta.url)
+
+    def test_login_do_admin_nao_conta_nem_registra_tentativa(self):
+        """Este endereço não é mais um ponto de tentativa de senha."""
+        for _ in range(10):
+            Client().post('/admin/login/', {
+                'username': 'gestor2fa', 'password': 'errada', 'next': '/admin/'})
+        self.assertFalse(seguranca.usuario_bloqueado('gestor2fa'))
+
 class TesteBloqueioDeLoginPorEndereco(TestCase):
     """O bloqueio vale por par (usuário, endereço) e tem um teto por conta.
     Tentativas feitas durante o bloqueio não renovam o prazo. Antes, quem

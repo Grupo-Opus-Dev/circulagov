@@ -44,7 +44,8 @@ dos sistemas com 2FA hoje.
 (ver `dois_fatores/views.py` e `FLUXO_AUTENTICACAO.md`). Isso garante
 que a senha sozinha nunca é suficiente para autenticar quem tem 2FA
 ativado. Mesmo que um invasor descubra a senha de alguém, ainda
-precisa do código do app autenticador.
+precisa do código do app autenticador. Isso vale para todo caminho de
+entrada porque o login do admin também passa por aqui (seção 12).
 
 **Por que o 2FA é opcional:** para o MVP, exigir 2FA de todo mundo
 adicionaria fricção desnecessária no cadastro inicial. A abordagem
@@ -331,3 +332,33 @@ uma única finalidade. Se uma vazar, a outra proteção continua valendo.
 **Por que a tela de verificação é só para administradores:** o
 resultado mostra em qual linha o log foi alterado, informação que
 ajudaria um invasor a testar se conseguiu esconder rastros.
+
+## 12. O admin do Django usa o login da aplicação
+
+**Onde:** `usuarios/admin_site.py`, `usuarios/admin_config.py` e `INSTALLED_APPS`
+em `config/settings.py`
+
+O admin do Django traz um login próprio, com formulário e rota próprios
+(`/admin/login/`). Esse login não passa pelo segundo fator nem pelo bloqueio por
+tentativas, que existem só no login da aplicação. Resultado, comprovado por
+teste: quem tinha a senha de uma conta de gestão entrava no `/admin/` sem o
+código, mesmo com o 2FA ativo, e podia tentar senhas sem limite. O limite do
+nginx também não cobria esse caminho.
+
+O que a documentação afirmava, que a senha sozinha nunca basta para quem tem
+2FA, valia só para o login da aplicação.
+
+**A correção** troca o site de administração por um que não autentica ninguém. O
+`/admin/login/` passou a só redirecionar para o login da aplicação, e o admin
+aceita a sessão que sai de lá. Assim ele herda o segundo fator e o bloqueio por
+tentativas, sem duplicar código. A troca usa o mecanismo documentado do Django
+para substituir o site padrão, e não altera tabelas.
+
+**Por que não só desligar o `/admin/`:** ele continua útil para consultar e
+corrigir dados que a área de gestão não cobre. Desligar tiraria essa
+ferramenta sem necessidade, agora que o contorno acabou.
+
+**O que continua valendo.** O 2FA segue opcional: uma conta de gestão que nunca o
+ativou entra no admin só com a senha, como entra na aplicação. Exigir o segundo
+fator de toda conta de gestão seria uma decisão de política, e não foi tomada.
+
