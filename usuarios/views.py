@@ -6,7 +6,7 @@ from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect, render
 
 from dois_fatores.models import DispositivoTOTP
-from dois_fatores.views import CHAVE_USUARIO_PENDENTE
+from dois_fatores.views import iniciar_etapa_pendente
 from .seguranca import calcular_atraso, limpar_tentativas, registrar_falha, usuario_bloqueado
 
 logger = logging.getLogger('seguranca.autenticacao')
@@ -56,7 +56,7 @@ class LoginComDoisFatoresView(LoginView):
         tem_2fa = dispositivos_confirmados.exists()
 
         if tem_2fa:
-            self.request.session[CHAVE_USUARIO_PENDENTE] = usuario.pk
+            iniciar_etapa_pendente(self.request.session, usuario.pk)
             return redirect('dois_fatores:verificar')
 
         return super().form_valid(formulario)

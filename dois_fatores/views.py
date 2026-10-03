@@ -1,16 +1,25 @@
 import logging
+import time
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
-from . import qrcode_totp
+from . import limite, qrcode_totp
 from .models import DispositivoTOTP
 
 Usuario = get_user_model()
 
 CHAVE_USUARIO_PENDENTE = 'usuario_pendente_id'
+CHAVE_PENDENTE_DESDE = 'usuario_pendente_desde'
+
+# Quanto tempo a pessoa tem pra digitar o código depois de acertar a senha.
+# Sem prazo, a sessão com a senha já validada ficaria aberta até expirar
+# por inatividade, e como ela renova a cada requisição, quase indefinidamente.
+SEGUNDOS_PARA_O_SEGUNDO_FATOR = getattr(
+    settings, 'SEGUNDOS_PARA_O_SEGUNDO_FATOR', 5 * 60)
 
 logger = logging.getLogger('seguranca.dois_fatores')
 
@@ -46,6 +55,17 @@ def cadastrar(request):
     })
 
 
+def iniciar_etapa_pendente(sessao, usuario_id):
+    """Guarda que a senha foi aceita e quando, pra etapa do código expirar."""
+    sessao[CHAVE_USUARIO_PENDENTE] = usuario_id
+    sessao[CHAVE_PENDENTE_DESDE] = int(time.time())
+
+
+def _encerrar_etapa_pendente(sessao):
+    sessao.pop(CHAVE_USUARIO_PENDENTE, None)
+    sessao.pop(CHAVE_PENDENTE_DESDE, None)
+
+
 def verificar(request):
     """Segunda etapa do login. Enquanto usuario_pendente_id existir na
     sessão, o usuário passou pela senha mas ainda não está autenticado -
@@ -55,19 +75,40 @@ def verificar(request):
     if pendente_id is None:
         return redirect('login')
 
+    desde = request.session.get(CHAVE_PENDENTE_DESDE, 0)
+    if time.time() - desde > SEGUNDOS_PARA_O_SEGUNDO_FATOR:
+        _encerrar_etapa_pendente(request.session)
+        logger.warning('etapa do 2FA expirou, usuario_id=%s', pendente_id)
+        messages.error(request, 'Tempo esgotado. Entre de novo com usuário e senha.')
+        return redirect('login')
+
     if request.method == 'POST':
+        usuario = Usuario.objects.get(pk=pendente_id)
+
+        if limite.bloqueado(pendente_id):
+            # Nao confere o codigo (nem o certo passa) e nao soma falha:
+            # somar durante o bloqueio renovaria o prazo.
+            logger.warning(
+                'bloqueio por forca bruta no 2FA, username=%s',
+                usuario.get_username())
+            messages.error(
+                request,
+                'Muitas tentativas com código incorreto. '
+                'Aguarde alguns minutos e entre de novo.')
+            return render(request, 'dois_fatores/verificar.html')
+
         codigo = request.POST.get('codigo', '')
-        dispositivos_confirmados = DispositivoTOTP.objects.filter(
+        dispositivo = DispositivoTOTP.objects.filter(
             usuario_id=pendente_id, confirmado=True
-        )
-        dispositivo = dispositivos_confirmados.first()
+        ).first()
 
         if dispositivo and dispositivo.verificar_codigo(codigo):
-            del request.session[CHAVE_USUARIO_PENDENTE]
-            usuario = Usuario.objects.get(pk=pendente_id)
+            _encerrar_etapa_pendente(request.session)
+            limite.limpar(pendente_id)
             login(request, usuario)
             return redirect('usuarios:inicio')
 
+        limite.registrar_falha(pendente_id)
         messages.error(request, 'Código inválido.')
 
     return render(request, 'dois_fatores/verificar.html')
