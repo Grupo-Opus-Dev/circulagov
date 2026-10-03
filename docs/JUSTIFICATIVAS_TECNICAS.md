@@ -159,12 +159,29 @@ precisaria de milhares de tentativas para ter chance de acertar uma
 senha com Argon2, se torna impraticável com esse limite combinado ao
 atraso progressivo.
 
-**Por que o bloqueio é por username e não por IP:** bloquear por IP
-sozinho permitiria que um invasor usasse vários IPs diferentes (bem
-comum em ataques reais) para contornar o limite. Bloquear por
-username garante que aquela conta específica fica protegida
-independentemente de onde vêm as tentativas, é a mesma lógica usada
-por grande parte dos sistemas de login com proteção anti-força-bruta.
+**Por que o bloqueio é por usuário e endereço, com um teto por conta:**
+bloquear só por endereço deixaria um invasor trocar de endereço (comum em
+ataques reais) para contornar o limite. Bloquear só por usuário deixaria
+qualquer pessoa trancar a conta de outra apenas errando a senha dela. Por
+isso há dois contadores:
+
+- por par (usuário, endereço): 5 falhas em 15 minutos bloqueiam aquele
+  endereço para aquele usuário, sem afetar quem acessa de outro lugar;
+- por conta, somando todos os endereços: 25 falhas em 15 minutos bloqueiam
+  a conta para todos. O teto é alto para que o dono da conta não seja
+  trancado por um ou dois atacantes, e baixo o bastante para que tentar
+  senhas de muitos endereços deixe de compensar.
+
+O endereço vem do cabeçalho `X-Real-IP`, que o nginx sobrescreve com o
+endereço real da conexão (`CABECALHO_IP_DO_CLIENTE` em `config/settings.py`).
+O cabeçalho não pode vir do cliente, porque o nginx o substitui sempre.
+
+**Por que o bloqueio não é renovado enquanto dura:** a contagem começa na
+primeira falha e, ao chegar no limite, recomeça por 15 minutos cheios.
+Tentativas feitas durante o bloqueio não somam. Antes, cada uma delas
+reiniciava o prazo, e quem continuava tentando, inclusive o próprio dono da
+conta, ficava bloqueado indefinidamente. Os testes estão em
+`TesteBloqueioDeLoginPorEndereco`, em `usuarios/tests.py`.
 
 ## 6. Model de usuário customizado
 
