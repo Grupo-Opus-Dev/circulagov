@@ -162,6 +162,105 @@ curl -I https://circulagov.nossoprojeto.app.br
 E, de fora da VPS, confirme que só 22, 80 e 443 respondem. A 8000 precisa
 estar inacessível: se responder, a porta foi publicada sem o `127.0.0.1`.
 
+## Limite de requisições no nginx
+
+O contador de força bruta do aplicativo é por nome de usuário. Falta um limite
+por endereço na frente dele, que barre quem dispara muitas tentativas com nomes
+inventados, e que cubra as telas que não têm trava nenhuma no código: a
+verificação do segundo fator e o pedido de recuperação de senha.
+
+A configuração está em `deploy/nginx/` e **só vale depois de instalada no nginx
+do servidor**. Este repositório não a aplica sozinho.
+
+| Limite, por IP | Taxa | Burst |
+|---|---|---|
+| `POST /contas/login/` | 30 por minuto | 15 |
+| `POST /dois-fatores/verificar/` | 10 por minuto | 5 |
+| `POST /recuperar-senha/` | 3 por minuto | 3 |
+| qualquer rota | 20 por segundo | 60 |
+
+Quem passa do limite recebe `429 Too Many Requests`. O burst existe para quem erra a
+senha duas vezes seguidas não ser barrado.
+
+### Instalar
+
+```bash
+cd ~/apps/circulagov
+git pull
+sudo cp deploy/nginx/circulagov-limites.conf /etc/nginx/conf.d/
+sudo cp deploy/nginx/circulagov-limites-servidor.conf /etc/nginx/snippets/
+```
+
+Agora acrescente **uma linha** dentro do bloco `server` que escuta na porta 443,
+no arquivo do site. O certbot mexeu nesse arquivo, então abra e confira antes de
+editar:
+
+```bash
+sudo nano /etc/nginx/sites-available/circulagov
+```
+
+A linha:
+
+```nginx
+include /etc/nginx/snippets/circulagov-limites-servidor.conf;
+```
+
+Ela vai no bloco do `listen 443 ssl`, não no que só redireciona a porta 80.
+Depois, **sempre teste antes de recarregar**:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Se o `nginx -t` reclamar, o nginx continua rodando com a configuração antiga.
+Não recarregue até ele aprovar.
+
+### Conferir que está valendo
+
+De fora do servidor:
+
+```bash
+for i in $(seq 1 20); do
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://circulagov.nossoprojeto.app.br/contas/login/
+done | sort | uniq -c
+```
+
+O esperado é algo como `16 403` e `4 429`. O 403 é a proteção CSRF do Django
+respondendo a um POST sem formulário, o que é normal e mostra que a requisição
+passou pelo nginx. O que prova o limite são os 429. Se vierem 20 respostas 403 e
+nenhum 429, o `include` não foi para o bloco certo.
+
+Isso limita o seu IP no login por alguns segundos, e passa sozinho.
+
+### Voltar atrás
+
+Apague a linha do `include`, rode `sudo nginx -t && sudo systemctl reload nginx`.
+
+### O teste automatizado
+
+`deploy/nginx/testar-limites.sh` sobe um nginx de verdade num container, com um
+servidor falso atrás, e confere que o 429 aparece onde deve e **não** aparece
+onde não deve. Por exemplo, que um GET em `/contas/login/` não é contado no
+limite do POST. Roda no GitHub Actions a cada push, como o job `nginx`. Precisa
+de Docker e de rede `host`, então localmente só em Linux.
+
+### O que este limite não resolve
+
+- **Ataque distribuído.** O limite é por IP. Quem usa muitos endereços passa por
+  ele, e a defesa contra isso é outra camada, fora do alcance do projeto.
+- **Trava por conta no segundo fator.** O limite reduz a velocidade, mas a
+  verificação do 2FA continua sem bloqueio por conta no código. Um atacante que
+  já tem a senha pode, de um endereço só, tentar até 14 mil códigos por dia.
+- **Cota de e-mail.** Três pedidos por minuto de um único endereço somam mais de
+  4 mil por dia, mais que a cota diária de envios de uma conta Gmail. O limite
+  contém o abuso, mas não o impede.
+- **Endereço compartilhado.** Uma sala inteira atrás do mesmo endereço de rede
+  divide o mesmo limite. Se isso virar problema, aumente `rate` e `burst` em
+  `circulagov-limites.conf`.
+- **Proxy na frente do nginx.** Se um dia o site ficar atrás de um CDN, o nginx
+  passa a enxergar o endereço do CDN, e todos dividem o mesmo limite. Será
+  preciso o módulo `real_ip`.
+
 ## Se a cadeia do log quebrar
 
 A tela `/auditoria/integridade/` e o comando `verificar_logs` mostram

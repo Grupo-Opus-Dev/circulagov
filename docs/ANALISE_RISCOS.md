@@ -108,9 +108,39 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Comprometimento do segundo fator e possível acesso não autorizado à conta.
 
+### 10. Força bruta no código do segundo fator
+
+**Descrição:** Quem já conhece a senha de uma conta com 2FA pode tentar códigos de 6 dígitos na etapa de verificação. Essa etapa não tem trava de tentativas por conta no código.
+
+**Ativo afetado:** Contas protegidas por segundo fator.
+
+**Impacto:** Acesso não autorizado, anulando o benefício do segundo fator.
+
+### 11. Zerar o bloqueio de login com nomes inventados
+
+**Descrição:** O contador de tentativas fica numa tabela de cache com teto de entradas. Passando do teto, parte dos contadores é descartada, e quem tenta senhas contra uma conta poderia apagar o próprio bloqueio disparando tentativas com nomes de usuário inventados.
+
+**Ativo afetado:** Credenciais e senhas dos usuários.
+
+**Impacto:** Contorno da proteção contra força bruta.
+
+### 12. Abuso do e-mail de recuperação de senha
+
+**Descrição:** Cada pedido de recuperação dispara um e-mail. Sem limite, alguém pode encher a caixa de uma pessoa e esgotar a cota diária de envios da conta de e-mail.
+
+**Ativo afetado:** Tokens de recuperação e o canal de e-mail.
+
+**Impacto:** Indisponibilidade da recuperação de senha e incômodo ao titular da conta.
+
 ### Lacunas identificadas
 
 Além das ameaças já consideradas pelo projeto, outras ameaças podem ser identificadas durante a análise. Quando uma ameaça ainda não possui uma proteção implementada, ela deve ser registrada como uma lacuna de segurança para avaliação posterior.
+
+Lacunas conhecidas hoje:
+
+- a verificação do segundo fator e o pedido de recuperação de senha não têm trava de tentativas por conta no código (ameaças 10 e 12)
+- o limite de requisições por endereço não barra um ataque distribuído por muitos endereços
+- não há backup do banco nem do log de segurança
 
 ## 6.8 Risco x Contramedida
 
@@ -241,3 +271,45 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 **Onde está no código:** `dois_fatores/cripto.py`, `dois_fatores/models.py` e `config/settings.py`.
 
 **Risco residual:** Médio.
+
+### 10. Força bruta no código do segundo fator
+
+**Probabilidade:** Baixa
+
+**Impacto:** Alta
+
+**Risco resultante:** Médio
+
+**Contramedida implementada:** Limite de requisições por endereço na verificação do segundo fator, 10 por minuto, no nginx. A configuração está no repositório e só vale depois de instalada no servidor.
+
+**Onde está no código:** `deploy/nginx/circulagov-limites.conf`. Não há trava por conta na aplicação.
+
+**Risco residual:** Médio. O limite reduz a velocidade por endereço, mas não impede um ataque distribuído, e a aplicação continua sem bloquear a conta.
+
+### 11. Zerar o bloqueio de login com nomes inventados
+
+**Probabilidade:** Média
+
+**Impacto:** Alta
+
+**Risco resultante:** Alto
+
+**Contramedida implementada:** Teto de 100 mil entradas no cache em banco, e limite de requisições por endereço no login.
+
+**Onde está no código:** `config/settings.py` e `deploy/nginx/circulagov-limites.conf`. O teste `test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio`, em `usuarios/tests.py`, demonstra o mecanismo.
+
+**Risco residual:** Baixo. Seriam necessárias mais de 100 mil tentativas com nomes distintos em 15 minutos.
+
+### 12. Abuso do e-mail de recuperação de senha
+
+**Probabilidade:** Média
+
+**Impacto:** Média
+
+**Risco resultante:** Médio
+
+**Contramedida implementada:** Limite de requisições por endereço no pedido de recuperação, 3 por minuto, no nginx.
+
+**Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
+
+**Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.

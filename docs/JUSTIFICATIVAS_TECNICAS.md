@@ -134,9 +134,18 @@ O teto de produção foi elevado a 100 mil entradas (`MAX_ENTRIES` em
 e não contam para ele. Isso não elimina o problema, só o torna caro: um
 atacante ainda poderia zerar um contador disparando mais de 100 mil
 tentativas com nomes distintos dentro de 15 minutos, algo como 110
-requisições por segundo sustentadas. A defesa completa seria um limite de
-requisições por endereço no nginx, em complemento ao bloqueio por
-usuário, e fica como melhoria futura. Não está implementada.
+requisições por segundo sustentadas.
+
+A defesa complementar é um limite de requisições por endereço no nginx. A
+configuração, com teste automatizado, está em `deploy/nginx/` e **só vale
+depois de instalada no nginx do servidor**, passo descrito em
+[DEPLOY.md](DEPLOY.md). Ela encarece o ataque, mas não o elimina: quem usa
+muitos endereços passa por ela.
+
+**Duas telas não têm trava por conta no código.** A verificação do código do
+segundo fator e o pedido de recuperação de senha não contam tentativas. Só o
+limite por endereço do nginx as protege, e ele reduz a velocidade sem impedir
+o ataque. Fica registrado como lacuna, e não como risco resolvido.
 
 O ponto foi descoberto ao documentar o deploy, depois de o contador já
 estar em produção.
