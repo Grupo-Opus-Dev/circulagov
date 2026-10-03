@@ -88,7 +88,7 @@ docker compose logs -f web
 ```
 
 O `entrypoint.sh` roda sozinho a cada subida: espera o banco, aplica
-migrações, cria a tabela de cache, coleta os estáticos e sobe o Gunicorn.
+migrações (inclusive a dos contadores de tentativas), coleta os estáticos e sobe o Gunicorn.
 
 ### 4. Criar o administrador
 

@@ -1,6 +1,4 @@
-import os
-import subprocess
-import sys
+import threading
 import time
 from unittest import mock
 
@@ -8,14 +6,16 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 from django.core import mail
-from django.core.cache import cache
-from django.core.management import call_command
-from django.test import Client, TestCase, override_settings
+from django.db import connection
+from django.test import (
+    Client, TestCase, TransactionTestCase, override_settings,
+)
 from django.urls import reverse
 
 from alunos.models import Aluno
 from dois_fatores.models import DispositivoTOTP
-from usuarios import seguranca
+from usuarios import contadores, seguranca
+from usuarios.models import ContadorDeTentativas
 from usuarios.signals import CHAVE_INICIO_SESSAO
 
 Usuario = get_user_model()
@@ -657,74 +657,93 @@ class TesteCadastroComLinkDeSenha(TestCase):
         self.assertTrue(criado.check_password('SenhaForte!2026'))
 
 
-def _cache_em_banco(**opcoes):
-    return {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': 'cache_teste_bloqueio',
-            'OPTIONS': opcoes,
-        }
-    }
+class TesteContadoresAtomicos(TransactionTestCase):
+    """Os contadores de tentativas precisam contar cada falha uma vez, mesmo
+    com várias requisições ao mesmo tempo (os workers do Gunicorn rodam em
+    paralelo). O cache.incr() do cache em banco lia e gravava em passos
+    separados, e duas falhas simultâneas podiam contar como uma."""
 
+    def _em_paralelo(self, quantidade, tarefa):
+        barreira = threading.Barrier(quantidade)
+        erros = []
 
-class TesteDescarteDoCacheDeBloqueio(TestCase):
-    """O contador de força bruta fica no cache em banco, em produção. O
-    cache em banco do Django tem limite de entradas e, ao passar dele,
-    apaga um terço delas POR ORDEM ALFABÉTICA DA CHAVE, e não as mais
-    antigas. Sem limite folgado, quem tenta senhas contra uma conta
-    zera o próprio bloqueio mandando tentativas com nomes inventados."""
+        def executar():
+            try:
+                barreira.wait(timeout=10)
+                tarefa()
+            except Exception as erro:  # noqa: BLE001
+                erros.append(erro)
+            finally:
+                connection.close()
 
-    def _preparar(self, **opcoes):
-        override = override_settings(CACHES=_cache_em_banco(**opcoes))
-        override.enable()
-        self.addCleanup(override.disable)
-        call_command('createcachetable', 'cache_teste_bloqueio', verbosity=0)
+        threads = [threading.Thread(target=executar) for _ in range(quantidade)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+        self.assertEqual(erros, [])
 
-    def _spray(self, quantidade):
-        # Nomes que ordenam depois da vítima, só pra tornar o teste
-        # determinístico: o descarte apaga as chaves do começo da ordem.
-        for i in range(quantidade):
-            seguranca.registrar_falha(f'zzz_inventado_{i:04d}')
+    def test_falhas_simultaneas_sao_todas_contadas(self):
+        self._em_paralelo(8, lambda: contadores.somar('conta_a', 900))
+        self.assertEqual(contadores.ler('conta_a'), 8)
 
-    def test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio(self):
-        """Demonstra o mecanismo, com limite baixo pra não precisar de
-        milhares de linhas. É o que explica o teste seguinte."""
-        self._preparar(MAX_ENTRIES=50)
-        for _ in range(4):
-            seguranca.registrar_falha('aaa_vitima')
+    def test_registrar_falha_simultaneo_conta_par_e_conta(self):
+        self._em_paralelo(
+            5, lambda: seguranca.registrar_falha('vitima', '10.0.0.1'))
+        self.assertEqual(contadores.ler(seguranca.chave_cache('vitima')), 5)
         self.assertEqual(
-            cache.get(seguranca.chave_cache('aaa_vitima')), 4)
+            contadores.ler(seguranca.chave_cache_par('vitima', '10.0.0.1')), 5)
+        self.assertTrue(seguranca.usuario_bloqueado('vitima', '10.0.0.1'))
 
-        self._spray(60)
+    def test_seis_tentativas_em_paralelo_nao_passam_do_limite_sem_bloquear(self):
+        # Com a contagem perdida, 6 tentativas simultâneas podiam deixar o
+        # contador em 4 ou 5 e o bloqueio nunca armar.
+        self._em_paralelo(
+            6, lambda: seguranca.registrar_falha('alvo', '10.0.0.2'))
+        self.assertTrue(seguranca.usuario_bloqueado('alvo', '10.0.0.2'))
 
-        self.assertIsNone(cache.get(seguranca.chave_cache('aaa_vitima')))
+    def test_falhas_do_2fa_simultaneas_armam_o_bloqueio(self):
+        from dois_fatores import limite
+        self._em_paralelo(5, lambda: limite.registrar_falha(4242))
+        self.assertTrue(limite.bloqueado(4242))
 
-    def test_limite_folgado_preserva_o_contador(self):
-        self._preparar(MAX_ENTRIES=100_000)
+    def test_criacao_simultanea_da_mesma_chave_nao_derruba_nem_perde(self):
+        # A primeira soma cria a linha. Com todos ao mesmo tempo, vários
+        # tentam criar e só um consegue; os outros precisam somar.
+        self._em_paralelo(10, lambda: contadores.somar('chave_nova', 900))
+        self.assertEqual(contadores.ler('chave_nova'), 10)
+
+    def test_janela_vencida_recomeca_do_um(self):
+        contadores.somar('janela', 60)
+        contadores.somar('janela', 60)
+        with mock.patch('time.time', return_value=time.time() + 61):
+            self.assertEqual(contadores.ler('janela'), 0)
+            self.assertEqual(contadores.somar('janela', 60), 1)
+
+    def test_chave_enorme_nao_derruba(self):
+        contadores.somar('x' * 100_000, 60)
+        self.assertEqual(contadores.ler('x' * 100_000), 1)
+
+    def test_nome_de_usuario_nao_fica_em_claro_no_banco(self):
+        contadores.somar('tentativas_login_maria', 60)
+        chaves = list(ContadorDeTentativas.objects.values_list('chave', flat=True))
+        self.assertTrue(all('maria' not in chave for chave in chaves))
+
+    def test_muitas_chaves_inventadas_nao_apagam_o_contador_da_vitima(self):
+        """O cache em banco apagava entradas por ordem alfabética ao passar
+        do limite, e quem tentava senhas zerava o próprio bloqueio com
+        nomes inventados. Aqui não existe descarte."""
         for _ in range(4):
-            seguranca.registrar_falha('aaa_vitima')
+            seguranca.registrar_falha('aaa_vitima', '10.0.0.3')
+        for i in range(400):
+            seguranca.registrar_falha(f'zzz_inventado_{i:04d}', '10.0.0.4')
+        self.assertEqual(contadores.ler(seguranca.chave_cache('aaa_vitima')), 4)
 
-        self._spray(400)
-
-        self.assertEqual(
-            cache.get(seguranca.chave_cache('aaa_vitima')), 4)
-
-    def test_configuracao_de_producao_tem_limite_folgado(self):
-        """Lê o settings de produção (DEBUG=False) num processo à parte,
-        porque os testes rodam com DEBUG=True e lá o cache nem é o de
-        banco. Pega a remoção acidental da opção."""
-        codigo = (
-            "import os, django;"
-            "os.environ['DJANGO_SETTINGS_MODULE']='config.settings';"
-            "from django.conf import settings;"
-            "print(settings.CACHES['default']['OPTIONS']['MAX_ENTRIES'])"
-        )
-        ambiente = dict(os.environ, DEBUG='False')
-        resultado = subprocess.run(
-            [sys.executable, '-c', codigo], cwd=settings.BASE_DIR,
-            env=ambiente, capture_output=True, text=True, timeout=60)
-        self.assertEqual(resultado.returncode, 0, resultado.stderr)
-        self.assertGreaterEqual(int(resultado.stdout.strip()), 50_000)
+    def test_entradas_vencidas_sao_limpas_ao_criar_nova(self):
+        contadores.somar('velha', 60)
+        with mock.patch('time.time', return_value=time.time() + 120):
+            contadores.somar('outra', 60)
+        self.assertEqual(ContadorDeTentativas.objects.count(), 1)
 
 
 class TesteAdminUsaOLoginDaAplicacao(TestCase):
@@ -800,7 +819,6 @@ class TesteBloqueioDeLoginPorEndereco(TestCase):
     insistia (inclusive a própria vítima) ficava bloqueado pra sempre."""
 
     def setUp(self):
-        cache.clear()
         self.senha = 'SenhaDeTeste123'
         Usuario = get_user_model()
         self.usuario = Usuario.objects.create_user(
@@ -808,7 +826,6 @@ class TesteBloqueioDeLoginPorEndereco(TestCase):
         patch = mock.patch('usuarios.views.time.sleep')
         patch.start()
         self.addCleanup(patch.stop)
-        self.addCleanup(cache.clear)
 
     def _tentar(self, senha, ip='10.0.0.1'):
         return self.client.post(
@@ -851,7 +868,7 @@ class TesteBloqueioDeLoginPorEndereco(TestCase):
         self._errar(5)
         self._errar(10)
         par = seguranca.chave_cache_par('vitima', '10.0.0.1')
-        self.assertEqual(cache.get(par), seguranca.LIMITE_TENTATIVAS)
+        self.assertEqual(contadores.ler(par), seguranca.LIMITE_TENTATIVAS)
 
     def test_outro_endereco_nao_e_bloqueado_pelos_erros_de_um_so(self):
         self._errar(5, ip='10.0.0.1')
@@ -870,9 +887,9 @@ class TesteBloqueioDeLoginPorEndereco(TestCase):
     def test_acerto_zera_so_o_contador_do_par(self):
         self._errar(3)
         self._tentar(self.senha)
-        self.assertIsNone(
-            cache.get(seguranca.chave_cache_par('vitima', '10.0.0.1')))
-        self.assertEqual(cache.get(seguranca.chave_cache('vitima')), 3)
+        self.assertEqual(
+            contadores.ler(seguranca.chave_cache_par('vitima', '10.0.0.1')), 0)
+        self.assertEqual(contadores.ler(seguranca.chave_cache('vitima')), 3)
 
     @override_settings(CABECALHO_IP_DO_CLIENTE='HTTP_X_REAL_IP')
     def test_usa_o_cabecalho_configurado_atras_do_proxy(self):

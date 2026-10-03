@@ -2,11 +2,12 @@ import time
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
 from . import cripto, qrcode_totp
+from usuarios import contadores
+
 from .models import DispositivoTOTP
 
 Usuario = get_user_model()
@@ -260,8 +261,6 @@ class TesteTravaDoSegundoFator(TestCase):
     pra tentar os 10^6 códigos possíveis, e a etapa não expirava nunca."""
 
     def setUp(self):
-        cache.clear()
-        self.addCleanup(cache.clear)
         self.senha = 'SenhaDeTeste123'
         self.usuario = Usuario.objects.create_user(
             username='com_2fa', password=self.senha)
@@ -333,7 +332,8 @@ class TesteTravaDoSegundoFator(TestCase):
             reverse('dois_fatores:verificar'),
             {'codigo': self.dispositivo.totp().now()})
         self.assertTrue(self._logado())
-        self.assertEqual(cache.get(f'tentativas_2fa_{self.usuario.pk}', 0), 0)
+        self.assertEqual(
+            contadores.ler(f'tentativas_2fa_{self.usuario.pk}'), 0)
 
     def test_bloqueio_vai_pro_log(self):
         self._passar_pela_senha()

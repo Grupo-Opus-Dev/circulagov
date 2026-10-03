@@ -1,5 +1,6 @@
 from django.conf import settings
-from django.core.cache import cache
+
+from . import contadores
 
 # Depois de LIMITE_TENTATIVAS falhas seguidas vindas do mesmo endereço contra
 # o mesmo usuário, esse par fica bloqueado por MINUTOS_BLOQUEIO minutos.
@@ -31,45 +32,32 @@ def chave_cache_par(nome_usuario, ip):
     return f'tentativas_login_{nome_usuario}|{ip}'
 
 
-def _somar(chave, limite):
-    """Soma uma falha. A janela de 15 minutos começa na primeira falha e
-    não anda a cada erro; ao chegar no limite ela recomeça, pra o bloqueio
-    durar o tempo cheio a partir dali."""
-    segundos = MINUTOS_BLOQUEIO * 60
-    cache.add(chave, 0, segundos)
-    try:
-        total = cache.incr(chave)
-    except ValueError:
-        # A entrada venceu entre o add e o incr.
-        cache.set(chave, 1, segundos)
-        return
-    if total == limite:
-        cache.set(chave, total, segundos)
-
-
 def usuario_bloqueado(nome_usuario, ip=''):
     """True se esse usuário já errou demais e precisa esperar."""
-    if cache.get(chave_cache(nome_usuario), 0) >= LIMITE_TENTATIVAS_POR_CONTA:
+    if contadores.ler(chave_cache(nome_usuario)) >= LIMITE_TENTATIVAS_POR_CONTA:
         return True
-    return cache.get(chave_cache_par(nome_usuario, ip), 0) >= LIMITE_TENTATIVAS
+    return contadores.ler(chave_cache_par(nome_usuario, ip)) >= LIMITE_TENTATIVAS
 
 
 def registrar_falha(nome_usuario, ip=''):
     """Soma mais uma tentativa errada pra esse usuário. Quem já está
     bloqueado não deve chegar aqui: renovar o contador durante o bloqueio
     faria quem insiste ficar bloqueado pra sempre."""
-    _somar(chave_cache(nome_usuario), LIMITE_TENTATIVAS_POR_CONTA)
-    _somar(chave_cache_par(nome_usuario, ip), LIMITE_TENTATIVAS)
+    segundos = MINUTOS_BLOQUEIO * 60
+    contadores.somar(
+        chave_cache(nome_usuario), segundos, LIMITE_TENTATIVAS_POR_CONTA)
+    contadores.somar(
+        chave_cache_par(nome_usuario, ip), segundos, LIMITE_TENTATIVAS)
 
 
 def limpar_tentativas(nome_usuario, ip=''):
     """Zera o contador do par depois que o usuário acerta a senha. O da
     conta continua, senão quem tem a senha de uma conta apagaria o teto
     com um login certo a cada 24 erros."""
-    cache.delete(chave_cache_par(nome_usuario, ip))
+    contadores.apagar(chave_cache_par(nome_usuario, ip))
 
 
 def calcular_atraso(nome_usuario, ip=''):
     """Atraso em segundos, proporcional às falhas recentes (até 2.5s)."""
-    tentativas = cache.get(chave_cache_par(nome_usuario, ip), 0)
+    tentativas = contadores.ler(chave_cache_par(nome_usuario, ip))
     return min(tentativas, 5) * 0.5
