@@ -146,10 +146,17 @@ if not DEBUG:
     # teria o proprio contador em memoria: 5 tentativas viram 5 por
     # worker. Guardar no banco mantem a contagem unica (requisito 1.11).
     # A tabela e criada com: python manage.py createcachetable
+    #
+    # MAX_ENTRIES precisa ser alto. O padrao do Django e 300, e ao passar
+    # disso ele apaga um terco das entradas por ordem alfabetica da chave,
+    # e nao as mais antigas. Com 300, quem tenta senhas contra uma conta
+    # zera o proprio bloqueio mandando tentativas com nomes inventados.
+    # Entradas vencidas (15 min) saem antes e nao contam pro limite.
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
             'LOCATION': 'cache_bloqueio_login',
+            'OPTIONS': {'MAX_ENTRIES': 100_000},
         }
     }
 

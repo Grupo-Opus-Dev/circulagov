@@ -92,9 +92,9 @@ válido para sempre no servidor. Invalidar no banco fecha essa brecha.
 
 **Onde:** `usuarios/seguranca.py`, usado em `usuarios/views.py`
 
-A proteção combina três camadas, todas usando o sistema de **cache**
-nativo do Django (`django.core.cache`) em vez de uma tabela nova no
-banco:
+A proteção combina três camadas, todas usando a interface de **cache**
+nativa do Django (`django.core.cache`), sem um model próprio para as
+tentativas:
 
 - **Contagem de tentativas (rate limit):** cada senha errada soma uma
   falha, associada ao nome de usuário digitado.
@@ -106,11 +106,40 @@ banco:
   ataques automatizados que dependem de testar muitas senhas por
   segundo.
 
-**Por que usar o cache em vez de uma tabela no banco:** contar
-tentativas de login é, por natureza, um dado temporário: depois de
-alguns minutos, a informação não importa mais. Usar o cache (que já
-vem pronto no Django, sem precisar de migração) evita crescer o banco
-de dados com registros descartáveis e mantém a solução mais simples.
+**Por que usar a interface de cache:** contar tentativas de login é,
+por natureza, um dado temporário: depois de alguns minutos, a informação
+não importa mais. O cache já entrega expiração automática, o que evita
+escrever e manter uma rotina de limpeza.
+
+**Qual cache em cada ambiente.** Em desenvolvimento, com um processo só,
+vale o cache em memória padrão do Django. Em produção o Gunicorn roda
+vários processos, e com cache em memória cada um teria a própria
+contagem: as 5 tentativas viram 5 por processo. Por isso, com
+`DEBUG=False`, o contador fica numa **tabela de cache no PostgreSQL**
+(`cache_bloqueio_login`), única para todos os processos. Foi escolhido em
+vez do Redis porque o banco já existe, e subir mais um serviço só para
+isso não se justificava no tamanho do projeto.
+
+**O limite que importa nessa escolha.** O cache em banco do Django tem um
+teto de entradas, e ao passar dele apaga um terço delas **por ordem
+alfabética da chave**, e não as mais antigas. O padrão é 300. Com esse
+valor, quem tenta senhas contra uma conta poderia zerar o próprio
+bloqueio mandando algumas centenas de tentativas com nomes de usuário
+inventados, porque cada nome cria uma entrada. O teste
+`test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio` demonstra o
+mecanismo com um limite baixo.
+
+O teto de produção foi elevado a 100 mil entradas (`MAX_ENTRIES` em
+`config/settings.py`), e as entradas vencidas, de 15 minutos, saem antes
+e não contam para ele. Isso não elimina o problema, só o torna caro: um
+atacante ainda poderia zerar um contador disparando mais de 100 mil
+tentativas com nomes distintos dentro de 15 minutos, algo como 110
+requisições por segundo sustentadas. A defesa completa seria um limite de
+requisições por endereço no nginx, em complemento ao bloqueio por
+usuário, e fica como melhoria futura. Não está implementada.
+
+O ponto foi descoberto ao documentar o deploy, depois de o contador já
+estar em produção.
 
 **Por que os números escolhidos (5 tentativas / 15 minutos / até
 2,5s):** o objetivo é equilibrar segurança com experiência do usuário

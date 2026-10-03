@@ -63,7 +63,7 @@ flowchart TB
     subgraph DADOS["Persistência"]
         pg[("PostgreSQL 17<br/>driver psycopg 3")]
         logfile["logs/seguranca.log<br/>cadeia de HMAC-SHA256"]
-        cache["Cache do Django<br/>contador de força bruta"]
+        cache["Tabela de cache no banco<br/>contador de força bruta"]
     end
 
     subgraph SEGREDOS["Segredos"]
@@ -196,7 +196,7 @@ marca de início da sessão não existir, ele desloga em vez de deixar passar.
 | Dados do aluno | tabela `alunos_aluno` | RA e nome, minimizados | `alunos/models.py` |
 | Sessão | tabela `django_session` | cookie HttpOnly, e Secure quando `DEBUG` é falso | `config/settings.py` |
 | Eventos de segurança | `logs/seguranca.log`, fora do git | cada linha assinada e encadeada com a anterior por HMAC-SHA256 | `auditoria/integridade.py` |
-| Tentativas de login | cache do Django, em memória | contador com janela de 15 min | `usuarios/seguranca.py` |
+| Tentativas de login | tabela de cache no PostgreSQL, em produção | contador com janela de 15 min, compartilhado entre os workers | `usuarios/seguranca.py` |
 | Chaves | `.env`, fora do git | nunca entram no código nem no banco | `config/settings.py` |
 
 ---
@@ -261,13 +261,16 @@ suporte estendido, o que evita trocar de versão no meio do projeto.
 
 ## 9. O que a arquitetura ainda não cobre
 
-Registrado de propósito, para não dar a entender que o sistema está pronto para
-produção:
+Registrado de propósito, para não dar a entender que o sistema não tem limites:
 
-- o cache de força bruta é o cache local em memória, então em mais de um
-  processo cada um teria a própria contagem. Em produção isso pediria Redis.
-- o e-mail de recuperação usa o backend de console, que escreve no terminal em
-  vez de enviar de verdade.
+- o contador de força bruta fica numa tabela de cache no banco, para ser único
+  entre os workers. Tem limite de 100 mil entradas: passando disso, o Django
+  apaga parte delas por ordem alfabética da chave, o que permitiria a quem
+  dispara dezenas de milhares de tentativas com nomes inventados zerar o
+  bloqueio de uma conta. O ponto está em
+  [JUSTIFICATIVAS_TECNICAS.md](JUSTIFICATIVAS_TECNICAS.md), seção 5.
+- o envio de e-mail passa por uma conta Gmail com senha de aplicativo, que serve
+  para o volume do projeto e tem limite diário de envios.
 - o log é arquivo local. A cadeia de HMAC detecta alteração, mas quem tiver
   acesso de escrita ao servidor ainda pode apagar o arquivo inteiro. Proteger
   contra isso exigiria enviar as linhas para fora da máquina.
