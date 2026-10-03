@@ -16,9 +16,9 @@ python manage.py runserver_plus --cert-file dev-cert.crt 127.0.0.1:8443
 ```
 
 O certificado (`dev-cert.crt`/`dev-cert.key`) é gerado na hora e nunca é
-commitado (está no `.gitignore`) — em produção, o certificado seria
-emitido por uma autoridade certificadora de verdade (ex: Let's Encrypt),
-atrás de um proxy como Nginx.
+commitado (está no `.gitignore`). Esta é a evidência de **desenvolvimento**.
+A de produção, com certificado emitido por uma autoridade certificadora de
+verdade, está na seção [Em produção](#em-produção), mais abaixo.
 
 ## Resultado
 
@@ -46,3 +46,55 @@ O cabeçalho `Strict-Transport-Security` confirma que o HSTS configurado
 no requisito 3.1 está ativo de verdade na resposta. O `Secure` no
 cookie confirma o requisito 3.2: esse cookie só é enviado pelo
 navegador em conexões HTTPS, nunca em HTTP puro.
+
+## Em produção
+
+O sistema está no ar em `https://circulagov.nossoprojeto.app.br`, atrás de
+um nginx, com certificado do Let's Encrypt emitido pelo certbot. A captura
+abaixo foi feita de fora da máquina, pela internet pública, em 03/10/2026.
+Arquivo completo em
+[`evidencias/16-evidencia-tls-producao.txt`](evidencias/16-evidencia-tls-producao.txt).
+
+**Protocolo, cifra e certificado**, obtidos com `openssl s_client`:
+
+```
+Protocol  : TLSv1.3
+Cipher    : TLS_AES_256_GCM_SHA384
+subject=CN=circulagov.nossoprojeto.app.br
+issuer=C=US, O=Let's Encrypt, CN=YE2
+Verify return code: 0 (ok)
+```
+
+O `Verify return code: 0` é o que diferencia esta evidência da local: o
+certificado foi validado contra as autoridades confiáveis do sistema, sem
+precisar aceitar uma exceção como no certificado autoassinado.
+
+**Validade.** O certificado vale de 02/10/2026 a 31/12/2026, e o certbot
+instala um temporizador que renova antes do vencimento.
+
+**Requisito 3.2, bloqueio de conexão insegura.** Uma requisição `http://`
+recebe `301 Moved Permanently` com `Location: https://...`, em vez de ser
+atendida em texto puro.
+
+**Cabeçalhos de segurança** na resposta HTTPS:
+
+```
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: same-origin
+Cross-Origin-Opener-Policy: same-origin
+```
+
+### O que esta evidência não cobre
+
+- **HSTS preload.** O cabeçalho declara `preload`, mas o domínio, um
+  `.app.br`, **não está na lista de preload dos navegadores**: ao contrário do
+  TLD `.app`, o `.br` não vem pré-cadastrado, e o cadastro em hstspreload.org
+  é um passo manual que não foi feito. A proteção da primeira visita, antes
+  de o navegador ter visto o cabeçalho, não existe. Conferido em 03/10/2026
+  na lista estática do Chromium (`transport_security_state_static.json`):
+  os TLDs `app` e `dev` constam, e `br`, `app.br` e este domínio não.
+- **Rede entre o nginx e o Gunicorn.** O TLS termina no nginx. Dali até a
+  aplicação o tráfego passa em texto puro, mas pela interface local
+  (`127.0.0.1`) da própria máquina, sem sair dela.

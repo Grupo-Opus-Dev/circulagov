@@ -58,9 +58,9 @@ real, para não criar um cadastro novo que o próprio sistema teria que validar.
 
 | Perfil | Identificador | Situação |
 |---|---|---|
-| Aluno | RA (Registro do Aluno) | modelado em `alunos/models.py`, faz login com o RA |
+| Aluno | RA (Registro do Aluno) | modelado em `alunos/models.py`, com RA e nome completo, vinculado a uma conta de usuário |
 | Bibliotecário | matrícula pública | previsto, ainda não modelado |
-| Administrador | matrícula pública | atendido hoje pelo `is_staff` do Django |
+| Administrador | matrícula pública | atendido pelo perfil de gestão (`is_staff`), que abre a gestão de usuários e a auditoria |
 | Escola | registro estadual da instituição | previsto, ainda não modelado |
 
 Detalhamento de cada dado coletado e sua finalidade em
@@ -72,9 +72,10 @@ Tudo abaixo funciona pelo front-end e tem teste automatizado.
 
 ### Autenticação e credenciais
 
-- login por usuário e senha, com o RA servindo de nome de usuário para alunos
+- login por usuário e senha
 - senha guardada com hash Argon2id, com salt único por usuário
-- segundo fator por TOTP, compatível com Google Authenticator e similares
+- segundo fator por TOTP, cadastrado escaneando um QR code gerado no próprio
+  servidor, compatível com Google Authenticator e similares
 - o login só se completa depois do código do segundo fator
 - sessão expira por inatividade em 30 minutos e por tempo absoluto em 12 horas
 - logout invalida a sessão no servidor
@@ -108,7 +109,24 @@ Tudo abaixo funciona pelo front-end e tem teste automatizado.
 - cada linha do log assinada e encadeada com a anterior por HMAC-SHA256, o que
   torna qualquer alteração detectável
 - tela para administrador verificar a integridade do log
+- tela com a lista dos eventos, com filtro por origem e nível, busca por usuário
+  e a posição de cada linha na cadeia de assinaturas
+- a cadeia é mantida pelo arquivo e não pela memória, para continuar íntegra
+  com vários processos gravando ao mesmo tempo
 - comandos `verificar_logs` e `analisar_logs`
+
+### Administração de contas
+
+O sistema não tem autocadastro, então as contas são criadas por quem tem o
+perfil de gestão:
+
+- cadastro por convite: a conta nasce sem senha e a pessoa recebe um link de 30
+  minutos para criar a própria, de modo que quem cadastra nunca conhece a senha
+- edição de e-mail, perfil, situação e vínculo com aluno
+- envio de novo link de senha, ou definição manual para contas cujo e-mail não
+  recebe mensagem
+- remoção do segundo fator de quem perdeu o aparelho
+- toda alteração entra no log de segurança com o nome de quem a fez
 
 ### Telas disponíveis
 
@@ -122,7 +140,11 @@ Tudo abaixo funciona pelo front-end e tem teste automatizado.
 | Redefinir senha | `/recuperar-senha/redefinir/<token>/` |
 | Meus consentimentos | `/consentimento/` |
 | Meus dados | `/meus-dados/` |
-| Integridade do log, só administrador | `/auditoria/integridade/` |
+| Eventos de segurança, só gestão | `/auditoria/eventos/` |
+| Integridade do log, só gestão | `/auditoria/integridade/` |
+| Lista de usuários, só gestão | `/gestao/usuarios/` |
+| Perfil, edição e senha de um usuário, só gestão | `/gestao/usuarios/<id>/` |
+| Novo usuário, só gestão | `/gestao/usuarios/novo/` |
 | Administração do Django | `/admin/` |
 
 ## 6. O que não está implementado
@@ -188,7 +210,8 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-A suíte de testes tem 109 testes:
+A suíte de testes tem 192 testes (em 03/10/2026), e roda a cada push e a cada Pull Request pelo
+GitHub Actions:
 
 ```bash
 python manage.py test
