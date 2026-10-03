@@ -110,7 +110,7 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 ### 10. Força bruta no código do segundo fator
 
-**Descrição:** Quem já conhece a senha de uma conta com 2FA pode tentar códigos de 6 dígitos na etapa de verificação. Essa etapa não tem trava de tentativas por conta no código.
+**Descrição:** Quem já conhece a senha de uma conta com 2FA pode tentar códigos de 6 dígitos na etapa de verificação. Sem trava de tentativas por conta e sem prazo para digitar o código, a sessão com a senha já aceita ficava aberta para tentar à vontade.
 
 **Ativo afetado:** Contas protegidas por segundo fator.
 
@@ -154,7 +154,7 @@ Além das ameaças já consideradas pelo projeto, outras ameaças podem ser iden
 
 Lacunas conhecidas hoje:
 
-- a verificação do segundo fator e o pedido de recuperação de senha não têm trava de tentativas por conta no código (ameaças 10 e 12)
+- o pedido de recuperação de senha não tem trava de tentativas por conta no código (ameaça 12)
 - o limite de requisições por endereço não barra um ataque distribuído por muitos endereços
 - não há backup do banco nem do log de segurança
 
@@ -296,11 +296,11 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Risco resultante:** Médio
 
-**Contramedida implementada:** Limite de requisições por endereço na verificação do segundo fator, 10 por minuto, no nginx. Instalado no servidor em 03/10/2026 e conferido de fora, pela internet.
+**Contramedida implementada:** Na aplicação, 5 códigos errados por conta bloqueiam a verificação por 15 minutos, e tentativas durante o bloqueio não renovam o prazo. A etapa do código expira 5 minutos depois da senha aceita. Além disso, limite de requisições por endereço na verificação, 10 por minuto, no nginx, instalado no servidor em 03/10/2026 e conferido de fora, pela internet.
 
-**Onde está no código:** `deploy/nginx/circulagov-limites.conf`. Não há trava por conta na aplicação.
+**Onde está no código:** `dois_fatores/limite.py` e `dois_fatores/views.py`. O nginx está em `deploy/nginx/circulagov-limites.conf`. Os testes estão em `TesteTravaDoSegundoFator`, em `dois_fatores/tests.py`.
 
-**Risco residual:** Médio. O limite reduz a velocidade por endereço, mas não impede um ataque distribuído, e a aplicação continua sem bloquear a conta.
+**Risco residual:** Baixo. São 5 tentativas em 15 minutos contra 1 milhão de códigos possíveis, e o código muda a cada 30 segundos.
 
 ### 11. Zerar o bloqueio de login com nomes inventados
 

@@ -362,3 +362,32 @@ ferramenta sem necessidade, agora que o contorno acabou.
 ativou entra no admin só com a senha, como entra na aplicação. Exigir o segundo
 fator de toda conta de gestão seria uma decisão de política, e não foi tomada.
 
+## 13. Trava de tentativas e prazo no segundo fator
+
+**Onde:** `dois_fatores/limite.py` e `dois_fatores/views.py`
+
+O código TOTP tem 6 dígitos. Quem já sabe a senha de uma conta chega na tela
+do código, e sem trava poderia tentar muitos códigos até acertar o da janela
+de 30 segundos. A etapa também não expirava: a sessão com a senha aceita
+continuava aberta enquanto houvesse requisições.
+
+**Por que a trava é por conta e não por endereço:** nessa etapa a conta já
+está identificada pela senha certa. Contar por endereço deixaria quem troca de
+endereço ganhar tentativas novas. Como o bloqueio só é alcançável por quem
+acertou a senha, ele não serve para trancar a conta de um desconhecido.
+
+**Por que 5 tentativas em 15 minutos:** a chance de acertar um código de 6
+dígitos em 5 tentativas é de 5 em 1 milhão por janela, e dá folga para quem
+erra a digitação ou o relógio do celular está um pouco fora.
+
+**Por que o bloqueio não é renovado enquanto dura:** durante o bloqueio a
+verificação nem confere o código, e a falha não soma. Se somasse, cada
+tentativa reiniciaria o prazo. Nem o código certo entra durante o bloqueio, e
+ele também vale se a pessoa passar pela senha de novo, porque o contador está
+na conta e não na sessão.
+
+**Por que a etapa expira em 5 minutos:** é tempo de sobra para abrir o app e
+digitar seis números. Passado o prazo, a pessoa volta ao login. O prazo evita
+que uma sessão esquecida na tela do código continue valendo.
+
+Os testes estão em `TesteTravaDoSegundoFator`, em `dois_fatores/tests.py`.

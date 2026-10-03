@@ -62,8 +62,9 @@ A `LoginComDoisFatoresView` consulta o model `DispositivoTOTP`
   inicial.
 - **Com 2FA confirmado:** o login **não** é concluído ainda. O sistema
   guarda o ID do usuário numa chave temporária da sessão
-  (`usuario_pendente_id`) e redireciona para a tela de verificação do
-  código.
+  (`usuario_pendente_id`), junto com o horário, e redireciona para a tela
+  de verificação do código. Essa etapa expira em 5 minutos, e depois de 5
+  códigos errados a conta fica bloqueada por 15 minutos nessa tela.
 
 ### 6. Digitação do código de 6 dígitos
 

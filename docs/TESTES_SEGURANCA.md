@@ -200,6 +200,22 @@ que eles detectam o problema.
 | `test_acerto_zera_so_o_contador_do_par` | idem | O teto da conta não é apagado por um login certo |
 | `test_usa_o_cabecalho_configurado_atras_do_proxy` | idem | Em produção o endereço vem do `X-Real-IP` do nginx |
 
+## 13. Trava de tentativas e prazo no segundo fator
+
+**Ameaça:** tentar muitos códigos de 6 dígitos depois de acertar a senha, e deixar a etapa do código aberta (ameaça 10 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_depois_de_5_erros_nem_o_codigo_certo_entra` | `dois_fatores/tests.py` (`TesteTravaDoSegundoFator`) | Com 5 erros a conta fica bloqueada e o código certo não entra |
+| `test_o_bloqueio_vale_mesmo_passando_pela_senha_de_novo` | idem | O contador é da conta, não da sessão |
+| `test_tentativas_durante_o_bloqueio_nao_renovam_o_prazo` | idem | Insistir não prolonga o bloqueio |
+| `test_acerto_zera_a_contagem` | idem | Quem acerta volta ao zero |
+| `test_bloqueio_vai_pro_log` | idem | O bloqueio gera linha no log de segurança |
+| `test_etapa_do_codigo_expira` | idem | Passados 5 minutos, o código certo não entra mais |
+| `test_etapa_expirada_nao_volta_a_valer` | idem | Depois de expirar, é preciso passar pela senha de novo |
+| `test_expiracao_vai_pro_log` | idem | A expiração gera linha no log |
+| `test_dentro_do_prazo_a_etapa_segue_valendo` | idem | Antes dos 5 minutos a tela continua disponível |
+
 ## Execução contínua
 
 Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,
