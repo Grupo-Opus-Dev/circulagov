@@ -229,6 +229,9 @@ python manage.py verificar_logs
   mil entradas. Passando disso, parte dos contadores é descartada, o que
   permitiria zerar o bloqueio de uma conta com dezenas de milhares de
   tentativas com nomes inventados
+- a verificação do segundo fator e o pedido de recuperação de senha não têm
+  trava de tentativas por conta no código, só o limite de requisições por
+  endereço do nginx (ver DEPLOY.md)
 - o e-mail de recuperação sai por uma conta Gmail, com limite diário de envios
 - o log é arquivo local: a cadeia de HMAC detecta alteração, mas quem tiver
   acesso de escrita ao servidor ainda pode apagar o arquivo inteiro

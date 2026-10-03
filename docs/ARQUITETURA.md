@@ -269,6 +269,10 @@ Registrado de propósito, para não dar a entender que o sistema não tem limite
   dispara dezenas de milhares de tentativas com nomes inventados zerar o
   bloqueio de uma conta. O ponto está em
   [JUSTIFICATIVAS_TECNICAS.md](JUSTIFICATIVAS_TECNICAS.md), seção 5.
+- a verificação do segundo fator e o pedido de recuperação de senha não têm
+  trava de tentativas por conta no código. A única proteção é o limite de
+  requisições por endereço do nginx, que reduz a velocidade e não impede um
+  ataque distribuído por muitos endereços.
 - o envio de e-mail passa por uma conta Gmail com senha de aplicativo, que serve
   para o volume do projeto e tem limite diário de envios.
 - o log é arquivo local. A cadeia de HMAC detecta alteração, mas quem tiver
