@@ -1,9 +1,13 @@
 import base64
 import logging
+import subprocess
+import sys
 import tempfile
+import time
 from io import StringIO
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -248,3 +252,104 @@ class AnalisarLogsCommandTests(TestCase):
     def test_arquivo_de_log_inexistente_gera_erro_claro(self):
         with self.assertRaises(CommandError):
             call_command('analisar_logs', stdout=StringIO())
+
+
+# Executado em processos separados pelo teste abaixo. Fica em texto, e não
+# como função, porque precisa rodar num interpretador novo, sem Django:
+# é isso que o Gunicorn faz ao criar cada worker.
+SCRIPT_TRABALHADOR = """
+import logging, sys, time
+from auditoria.integridade import HandlerLogIntegro
+
+caminho, chave, numero, quantidade, inicio = sys.argv[1:6]
+handler = HandlerLogIntegro(caminho, chave)
+handler.setFormatter(logging.Formatter('%(message)s'))
+log = logging.getLogger('trabalhador')
+log.propagate = False
+log.addHandler(handler)
+log.setLevel(logging.INFO)
+
+# Todos esperam o mesmo instante, pra disputar o arquivo de verdade.
+while time.time() < float(inicio):
+    time.sleep(0.001)
+
+for i in range(int(quantidade)):
+    log.info('worker %s evento %s', numero, i)
+"""
+
+
+class CadeiaComVariosProcessosTests(SimpleTestCase):
+    """O Gunicorn de produção roda vários processos, cada um com o seu
+    handler, todos gravando no mesmo arquivo. Na primeira versão a cadeia
+    vivia na memória de cada processo e quebrava sozinha em produção,
+    sem ninguém ter mexido no log."""
+
+    def setUp(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.caminho = Path(self.pasta.name) / 'seguranca.log'
+
+    def tearDown(self):
+        self.pasta.cleanup()
+
+    def test_handlers_alternando_no_mesmo_arquivo_mantem_a_cadeia(self):
+        """Determinístico: dois handlers, como dois workers, escrevendo
+        em revezamento. Falhava quando o último MAC ficava na memória."""
+        a = HandlerLogIntegro(self.caminho, CHAVE_TESTE)
+        b = HandlerLogIntegro(self.caminho, CHAVE_TESTE)
+        formato = logging.Formatter('%(message)s')
+        logs = []
+        for nome, handler in (('a', a), ('b', b)):
+            handler.setFormatter(formato)
+            log = logging.getLogger(f'teste.revezamento.{nome}.{id(handler)}')
+            log.propagate = False
+            log.addHandler(handler)
+            log.setLevel(logging.INFO)
+            logs.append(log)
+
+        for rodada in range(5):
+            logs[0].info('a %s', rodada)
+            logs[1].info('b %s', rodada)
+
+        a.close()
+        b.close()
+        resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
+        self.assertTrue(resultado.integro, resultado.motivo)
+        self.assertEqual(resultado.total_linhas, 10)
+
+    def test_quatro_processos_gravando_ao_mesmo_tempo(self):
+        inicio = time.time() + 1.5
+        processos = [
+            subprocess.Popen(
+                [sys.executable, '-c', SCRIPT_TRABALHADOR, str(self.caminho),
+                 CHAVE_TESTE, str(numero), '40', str(inicio)],
+                cwd=settings.BASE_DIR, stderr=subprocess.PIPE,
+            )
+            for numero in range(4)
+        ]
+        for processo in processos:
+            _, erro = processo.communicate(timeout=60)
+            self.assertEqual(processo.returncode, 0, erro.decode())
+
+        resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
+        self.assertTrue(
+            resultado.integro,
+            f'cadeia quebrou na linha {resultado.linha_com_problema}')
+        # Nenhuma linha pode se perder na disputa.
+        self.assertEqual(resultado.total_linhas, 160)
+
+    def test_ultima_linha_maior_que_o_bloco_de_leitura(self):
+        """A leitura do final do arquivo amplia o bloco quando a última
+        linha é maior que ele, em vez de assinar em cima de uma linha
+        cortada pela metade."""
+        gravar_eventos(self.caminho, ['x' * 20000])
+        gravar_eventos(self.caminho, ['depois da linha enorme'])
+        resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
+        self.assertTrue(resultado.integro, resultado.motivo)
+        self.assertEqual(resultado.total_linhas, 2)
+
+    def test_arquivo_de_trava_nao_entra_na_cadeia(self):
+        """A trava é um arquivo ao lado do log, e não parte dele."""
+        gravar_eventos(self.caminho, ['evento'])
+        self.assertTrue(Path(f'{self.caminho}.lock').exists())
+        resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
+        self.assertEqual(resultado.total_linhas, 1)

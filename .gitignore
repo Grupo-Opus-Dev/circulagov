@@ -228,3 +228,6 @@ dev-cert.key
 
 # Gerado pelo collectstatic, nao versionar.
 staticfiles/
+
+# Pasta dos logs de seguranca e o arquivo de trava entre processos.
+logs/

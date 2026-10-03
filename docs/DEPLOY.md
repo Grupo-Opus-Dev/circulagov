@@ -162,6 +162,33 @@ curl -I https://circulagov.nossoprojeto.app.br
 E, de fora da VPS, confirme que só 22, 80 e 443 respondem. A 8000 precisa
 estar inacessível: se responder, a porta foi publicada sem o `127.0.0.1`.
 
+## Se a cadeia do log quebrar
+
+A tela `/auditoria/integridade/` e o comando `verificar_logs` mostram
+"Log alterado na linha N". Antes de supor adulteração, olhe o que mudou
+no servidor: o defeito de vários workers, já corrigido, produzia exatamente
+esse sintoma.
+
+Para guardar o arquivo quebrado e começar uma cadeia nova, sem apagar nada:
+
+```bash
+cd ~/apps/circulagov
+docker compose exec web sh -c 'mv logs/seguranca.log "logs/seguranca-quebrado-$(date +%Y%m%d-%H%M%S).log"'
+docker compose restart web
+```
+
+O `restart` é necessário: os processos mantêm o arquivo aberto, e sem ele
+continuariam gravando no arquivo renomeado.
+
+Depois, para conferir que a cadeia nova fecha:
+
+```bash
+docker compose exec web python manage.py verificar_logs
+```
+
+Guarde o arquivo separado. Ele é a única prova do que aconteceu até ali,
+mesmo sem integridade verificável.
+
 ## Limitações conhecidas
 
 - não há backup automático do banco nem do log, só os volumes locais

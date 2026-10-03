@@ -87,6 +87,7 @@ verificadas"; depois, "Log alterado na linha 5".
 | Verificar com a chave errada | Falha |
 | Quebra de linha dentro do evento (log injection) | Vira espaço, não cria linha falsa |
 | Reiniciar o servidor | A cadeia continua de onde o arquivo parou |
+| Vários processos gravando ao mesmo tempo (workers do Gunicorn) | A cadeia se mantém, nenhuma linha se perde |
 
 ## Limites da proteção
 
@@ -102,11 +103,47 @@ Nenhuma proteção de log é absoluta. Os limites conhecidos são:
 3. **Apagar o arquivo inteiro.** A proteção detecta alteração, não
    impede. Em produção, o log deveria ser copiado para um servidor
    separado, onde a aplicação só consegue escrever.
-4. **Vários processos gravando ao mesmo tempo.** O handler protege a
-   ordem entre threads do mesmo processo. Com vários processos (ex:
-   vários workers do gunicorn) escrevendo no mesmo arquivo, a cadeia
-   pode se misturar. Nesse cenário, cada processo deveria ter seu
-   próprio arquivo.
-5. **Linhas anteriores à proteção.** O log gravado antes desta
+4. **Linhas anteriores à proteção.** O log gravado antes desta
    implementação não tinha assinatura e foi separado em outro arquivo,
    porque não há como provar sua integridade depois do fato.
+
+## Vários processos gravando no mesmo log
+
+Em produção o Gunicorn roda vários processos, cada um com o seu handler,
+todos gravando em `logs/seguranca.log`. Isso exige que a cadeia seja
+mantida pelo **arquivo**, e não pela memória de cada processo.
+
+**O que aconteceu.** A primeira versão do handler guardava o último MAC
+em memória e só lia o arquivo quando o servidor subia. Com um processo,
+como em desenvolvimento, funcionava. Em produção, com três workers, cada
+um calculava a linha seguinte a partir de uma linha que já podia não ser
+a última, e a cadeia quebrava sozinha. A tela de integridade do log
+acusou "Log alterado na linha 3" sem que ninguém tivesse mexido no
+arquivo. Esse limite estava listado aqui como conhecido, e mesmo assim o
+deploy foi feito com três workers: o limite escrito não foi cruzado com a
+configuração de produção.
+
+**Como funciona agora.** A cada evento, o handler:
+
+1. pega uma trava entre processos (`flock` no Linux), num arquivo
+   `seguranca.log.lock` ao lado do log
+2. lê a assinatura da **última linha do arquivo**
+3. calcula o MAC dessa assinatura com o texto novo
+4. grava a linha e solta a trava
+
+A trava fica num arquivo separado porque, no Windows, travar um trecho
+do próprio log impediria o mesmo handler de ler o final dele. A leitura
+do final do arquivo usa blocos que dobram de tamanho, então linhas longas
+não são assinadas em cima de uma linha cortada.
+
+**Como foi verificado.** Os testes em `CadeiaComVariosProcessosTests`
+incluem quatro processos gravando ao mesmo tempo, esperando o mesmo
+instante para disputar o arquivo, e conferem que a cadeia fecha e que
+nenhuma das 160 linhas se perdeu. Rodados contra o handler antigo, os
+testes de regressão falham.
+
+**O arquivo anterior.** Um log cuja cadeia quebrou por esse defeito
+não indica adulteração, e também não dá para provar o contrário. O
+tratamento é o mesmo do log anterior à proteção: separar em outro
+arquivo, sem apagar, e começar uma cadeia nova. O procedimento está em
+[DEPLOY.md](DEPLOY.md).
