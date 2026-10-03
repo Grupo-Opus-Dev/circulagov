@@ -280,7 +280,7 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 
 **Risco resultante:** Médio
 
-**Contramedida implementada:** Limite de requisições por endereço na verificação do segundo fator, 10 por minuto, no nginx. A configuração está no repositório e só vale depois de instalada no servidor.
+**Contramedida implementada:** Limite de requisições por endereço na verificação do segundo fator, 10 por minuto, no nginx. Instalado no servidor em 03/10/2026 e conferido de fora, pela internet.
 
 **Onde está no código:** `deploy/nginx/circulagov-limites.conf`. Não há trava por conta na aplicação.
 

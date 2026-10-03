@@ -217,20 +217,41 @@ Não recarregue até ele aprovar.
 
 ### Conferir que está valendo
 
-De fora do servidor:
+De fora do servidor, com **uma única conexão**:
 
 ```bash
-for i in $(seq 1 20); do
-  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://circulagov.nossoprojeto.app.br/contas/login/
-done | sort | uniq -c
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  "https://circulagov.nossoprojeto.app.br/contas/login/?[1-40]" | sort | uniq -c
 ```
 
-O esperado é algo como `16 403` e `4 429`. O 403 é a proteção CSRF do Django
+O esperado é algo como `16 403` e `24 429`. O 403 é a proteção CSRF do Django
 respondendo a um POST sem formulário, o que é normal e mostra que a requisição
-passou pelo nginx. O que prova o limite são os 429. Se vierem 20 respostas 403 e
-nenhum 429, o `include` não foi para o bloco certo.
+passou pelo nginx. O que prova o limite são os 429.
+
+**Por que numa conexão só.** O login admite uma requisição a cada 2 segundos, com
+folga de 15. Um `curl` por requisição abre uma conexão HTTPS nova a cada vez, e
+isso pode levar uns 0,6 segundo cada: 20 requisições somam mais de 10 segundos,
+o balde esvazia no mesmo ritmo em que enche, e nenhuma é barrada. Foi o que
+aconteceu na primeira conferência, e a configuração estava certa. Se vierem só
+403, antes de concluir que o `include` está no bloco errado, confirme que o teste
+foi numa conexão só.
 
 Isso limita o seu IP no login por alguns segundos, e passa sozinho.
+
+### Estado em produção
+
+Instalado no nginx do servidor em 03/10/2026 e conferido de fora, pela internet,
+numa conexão só:
+
+| Cenário | Passaram | Receberam 429 |
+|---|---|---|
+| 40 POST em `/contas/login/` | 18 | 22 |
+| 12 POST em `/dois-fatores/verificar/` | 6 | 6 |
+| 8 POST em `/recuperar-senha/` | 4 | 4 |
+| 40 GET em `/contas/login/`, com o limite de POST esgotado | 40 | 0 |
+
+A última linha é a que mostra que o GET não é contado no limite do POST. Os
+números do 2FA e da recuperação são os mesmos do teste automatizado.
 
 ### Voltar atrás
 
