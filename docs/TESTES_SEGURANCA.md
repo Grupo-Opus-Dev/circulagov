@@ -250,6 +250,29 @@ que eles detectam o problema.
 
 Conferência manual feita em 03/10/2026: a tela de login abre com o CSS estático, sem o objeto `tailwind` no navegador e sem erros de CSP no console.
 
+## 16. Âncoras do log
+
+**Ameaça:** apagar o final do log, ou o arquivo inteiro, sem que a verificação acuse (ameaça 17 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_sem_ancora_o_corte_do_final_passa_batido` | `auditoria/tests.py` (`AncorasDoLogTests`) | Registra a limitação: sem âncora, o corte não é detectado |
+| `test_ancora_detecta_o_corte_do_final` | idem | Com âncora, apagar as últimas linhas reprova |
+| `test_ancora_detecta_arquivo_apagado` | idem | Com âncora, o arquivo sumir reprova |
+| `test_ancora_detecta_log_reescrito_com_o_mesmo_tamanho` | idem | Uma cadeia nova válida, com o mesmo número de linhas, reprova |
+| `test_log_que_cresceu_depois_da_ancora_continua_valendo` | idem | O log pode crescer depois da âncora |
+| `test_copia_externa_funciona_mesmo_sem_o_arquivo_local` | idem | A cópia fora do servidor detecta o corte mesmo com o arquivo local apagado |
+| `test_ancora_forjada_com_outra_chave_e_recusada` | idem | Âncora assinada com outra chave reprova |
+| `test_ancora_com_numero_de_linhas_adulterado_e_recusada` | idem | Editar o número de linhas invalida a assinatura |
+| `test_apagar_so_a_ancora_do_servidor_nao_gera_alarme` | idem | Registra a limitação: a âncora só no servidor pode ser apagada sem alarme |
+| `test_nao_emite_ancora_de_log_adulterado` | idem | Não se ancora um log já adulterado |
+| `test_nao_emite_ancora_de_log_vazio` | idem | Não se ancora um log vazio |
+| `test_email_leva_a_ancora_pra_fora_do_servidor` | idem | `--email` envia a âncora |
+| `test_ancora_nao_contem_a_chave` | idem | A âncora não vaza a chave |
+| `test_ler_ancoras_ignora_comentarios_e_linhas_soltas` | idem | O arquivo de âncoras aceita comentários |
+| `test_tela_mostra_o_corte_do_final` | idem | As telas de integridade e de eventos mostram o corte |
+| `test_tela_avisa_quando_nao_ha_ancora` | idem | A tela avisa que, sem âncora, o corte não seria detectado |
+
 ## Execução contínua
 
 Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,

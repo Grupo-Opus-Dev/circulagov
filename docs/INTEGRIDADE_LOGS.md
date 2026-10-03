@@ -56,6 +56,41 @@ python manage.py verificar_logs
 Se o log estiver íntegro, o comando mostra o total de linhas e o último
 MAC da cadeia. Se houver alteração, termina com erro indicando a linha.
 
+O comando também confere as âncoras, descritas abaixo. Sem nenhuma âncora, ele
+avisa que o corte do final do log não seria detectado.
+
+## Âncoras: detectar o corte do final do log
+
+A cadeia sozinha não percebe que as últimas linhas foram apagadas, nem que o
+arquivo inteiro sumiu: o que sobra continua válido. Uma **âncora** é uma foto
+da cadeia num instante, com o número de linhas, a assinatura da última e a
+data, assinada com a chave do log:
+
+```
+ancora linhas=412 mac=9f2c... em=2026-10-03T21:00:00+00:00 | sig=ab41...
+```
+
+```bash
+# emitir (recusa se o log já estiver adulterado ou vazio)
+docker compose exec web python manage.py emitir_ancora --email alguem@exemplo.com
+
+# conferir com as âncoras do servidor mais as de um arquivo guardado fora
+python manage.py verificar_logs --ancoras copia-das-ancoras.txt
+```
+
+A verificação reprova se o log tem menos linhas do que a âncora registrou,
+se a linha N não tem a assinatura que a âncora guardou (log reescrito, mesmo
+por quem tem a chave) e se o arquivo de log não existe mas há âncoras. Uma
+âncora com assinatura inválida também reprova, pois ignorá-la deixaria quem a
+adulterou sem consequência. O log pode crescer depois da âncora: ela só exige
+que o começo continue igual.
+
+O comando grava a âncora em `logs/ancoras.log` e, com `--email`, envia para
+fora do servidor. **Só a cópia fora do servidor protege de verdade**: quem
+apaga o final do log no servidor também consegue apagar `ancoras.log` de lá, e
+isso não gera alarme. A tela `/auditoria/integridade/` usa só as âncoras do
+servidor.
+
 ## Evidência
 
 Arquivo completo em
@@ -94,14 +129,17 @@ verificadas"; depois, "Log alterado na linha 5".
 Nenhuma proteção de log é absoluta. Os limites conhecidos são:
 
 1. **Remoção das últimas linhas.** Apagar linhas do final deixa uma
-   cadeia menor, mas ainda válida. Para detectar isso, o último MAC
-   mostrado pela verificação deve ser anotado fora do servidor
-   periodicamente e comparado depois.
+   cadeia menor, mas ainda válida. As âncoras detectam isso, desde que
+   uma cópia delas esteja fora do servidor e que sejam emitidas com
+   frequência: o que foi apagado depois da última âncora não é
+   detectado. Sem nenhuma âncora, o corte passa batido (há um teste que
+   registra esse comportamento).
 2. **Vazamento da chave.** Quem tiver a chave consegue recalcular a
    cadeia inteira. Por isso ela fica só em variável de ambiente e é
    diferente da chave de cifragem do 2FA.
 3. **Apagar o arquivo inteiro.** A proteção detecta alteração, não
-   impede. Em produção, o log deveria ser copiado para um servidor
+   impede. Com âncoras, o sumiço do arquivo é detectado. Para não
+   perder o conteúdo, o log ainda deveria ser copiado para um servidor
    separado, onde a aplicação só consegue escrever.
 4. **Linhas anteriores à proteção.** O log gravado antes desta
    implementação não tinha assinatura e foi separado em outro arquivo,

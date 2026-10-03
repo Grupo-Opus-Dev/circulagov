@@ -298,6 +298,32 @@ de Docker e de rede `host`, então localmente só em Linux.
   passa a enxergar o endereço do CDN, e todos dividem o mesmo limite. Será
   preciso o módulo `real_ip`.
 
+## Âncoras do log
+
+A cadeia do log não percebe o corte do final do arquivo. Uma âncora
+(`manage.py emitir_ancora`) registra quantas linhas o log tinha e qual era a
+assinatura da última, e a verificação passa a reprovar se isso mudar. Detalhes
+em `INTEGRIDADE_LOGS.md`.
+
+Para emitir uma âncora e mandá-la para fora do servidor:
+
+```bash
+cd ~/apps/circulagov
+docker compose exec web python manage.py emitir_ancora --email seu-email@exemplo.com
+```
+
+Guarde as mensagens recebidas num único arquivo de texto. Para conferir, copie o
+arquivo para dentro do contêiner e rode:
+
+```bash
+docker compose cp ancoras.txt web:/tmp/ancoras.txt
+docker compose exec web python manage.py verificar_logs --ancoras /tmp/ancoras.txt
+```
+
+A frequência define a janela cega: o que for apagado depois da última âncora
+não é detectado. Emitir uma por dia, por exemplo com o `cron` do servidor,
+reduz essa janela a um dia. Isso ainda não está agendado.
+
 ## Se a cadeia do log quebrar
 
 A tela `/auditoria/integridade/` e o comando `verificar_logs` mostram

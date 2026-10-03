@@ -11,12 +11,15 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
-from .integridade import HandlerLogIntegro, verificar_arquivo
+from .integridade import (
+    HandlerLogIntegro, gerar_ancora, ler_ancoras, verificar_arquivo,
+)
 
 Usuario = get_user_model()
 
@@ -548,3 +551,164 @@ class TesteComentariosDeTemplate(SimpleTestCase):
                 linha = texto.count('\n', 0, achado.start()) + 1
                 com_problema.append(f'{caminho.name}:{linha}')
         self.assertEqual(com_problema, [])
+
+
+class AncorasDoLogTests(TestCase):
+    """A cadeia sozinha não detecta o corte do FINAL do log: o que sobra
+    continua válido. A âncora, guardada fora, fecha essa lacuna."""
+
+    def setUp(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.caminho = Path(self.pasta.name) / 'seguranca.log'
+        self.extra = Path(self.pasta.name) / 'copia-externa.txt'
+        self.ancoras_local = Path(self.pasta.name) / 'ancoras.log'
+        self.override = override_settings(
+            LOG_DIR=Path(self.pasta.name), CHAVE_INTEGRIDADE_LOGS=CHAVE_TESTE)
+        self.override.enable()
+        gravar_eventos(self.caminho, [f'evento {n}' for n in range(1, 7)])
+
+    def tearDown(self):
+        self.override.disable()
+        self.pasta.cleanup()
+
+    def emitir(self, *argumentos):
+        saida = StringIO()
+        call_command('emitir_ancora', *argumentos, stdout=saida)
+        return saida.getvalue()
+
+    def linha_da_ancora(self):
+        texto = self.ancoras_local.read_text(encoding='utf-8')
+        return [l for l in texto.splitlines() if l.startswith('ancora ')][-1]
+
+    def cortar_final(self, quantas):
+        linhas = self.caminho.read_text(encoding='utf-8').splitlines()
+        self.caminho.write_text(
+            '\n'.join(linhas[:-quantas]) + '\n', encoding='utf-8')
+
+    def test_sem_ancora_o_corte_do_final_passa_batido(self):
+        """Limitação conhecida, registrada de propósito: sem âncora, o log
+        cortado continua parecendo íntegro."""
+        self.cortar_final(3)
+        resultado = verificar_arquivo(self.caminho, CHAVE_TESTE)
+        self.assertTrue(resultado.integro)
+
+    def test_ancora_detecta_o_corte_do_final(self):
+        self.emitir()
+        self.cortar_final(3)
+        with self.assertRaises(CommandError) as erro:
+            call_command('verificar_logs', stdout=StringIO())
+        self.assertIn('apagadas', str(erro.exception))
+
+    def test_ancora_detecta_arquivo_apagado(self):
+        self.emitir()
+        self.caminho.unlink()
+        with self.assertRaises(CommandError) as erro:
+            call_command('verificar_logs', stdout=StringIO())
+        self.assertIn('não existe', str(erro.exception))
+
+    def test_ancora_detecta_log_reescrito_com_o_mesmo_tamanho(self):
+        # Quem tem a chave reescreve a cadeia inteira, com o mesmo número
+        # de linhas, e a cadeia fecha. A âncora de antes denuncia.
+        self.emitir()
+        self.caminho.unlink()
+        gravar_eventos(self.caminho, [f'outro {n}' for n in range(1, 7)])
+        with self.assertRaises(CommandError) as erro:
+            call_command('verificar_logs', stdout=StringIO())
+        self.assertIn('reescrito', str(erro.exception))
+
+    def test_log_que_cresceu_depois_da_ancora_continua_valendo(self):
+        self.emitir()
+        gravar_eventos(self.caminho, ['evento 7', 'evento 8'])
+        saida = StringIO()
+        call_command('verificar_logs', stdout=saida)
+        self.assertIn('1 âncora(s) conferida(s)', saida.getvalue())
+
+    def test_copia_externa_funciona_mesmo_sem_o_arquivo_local(self):
+        """O atacante apaga as âncoras do servidor junto com o final do
+        log, mas a cópia que ficou fora ainda denuncia."""
+        saida = self.emitir()
+        self.extra.write_text(saida.splitlines()[0] + '\n', encoding='utf-8')
+        self.ancoras_local.unlink()
+        self.cortar_final(2)
+        with self.assertRaises(CommandError):
+            call_command(
+                'verificar_logs', '--ancoras', str(self.extra),
+                stdout=StringIO())
+
+    def test_ancora_forjada_com_outra_chave_e_recusada(self):
+        falsa = gerar_ancora(
+            OUTRA_CHAVE, 6, 'a' * 64, '2026-01-01T00:00:00+00:00')
+        self.ancoras_local.write_text(falsa + '\n', encoding='utf-8')
+        with self.assertRaises(CommandError) as erro:
+            call_command('verificar_logs', stdout=StringIO())
+        self.assertIn('assinatura inválida', str(erro.exception))
+
+    def test_ancora_com_numero_de_linhas_adulterado_e_recusada(self):
+        self.emitir()
+        self.ancoras_local.write_text(
+            self.ancoras_local.read_text(encoding='utf-8').replace(
+                'linhas=6', 'linhas=2'),
+            encoding='utf-8')
+        with self.assertRaises(CommandError):
+            call_command('verificar_logs', stdout=StringIO())
+
+    def test_apagar_so_a_ancora_do_servidor_nao_gera_alarme(self):
+        """Limitação conhecida: o arquivo local está no mesmo servidor do
+        log. É por isso que a cópia externa importa."""
+        self.emitir()
+        self.ancoras_local.unlink()
+        self.cortar_final(3)
+        saida = StringIO()
+        call_command('verificar_logs', stdout=saida)
+        self.assertIn('Nenhuma âncora conferida', saida.getvalue())
+
+    def test_nao_emite_ancora_de_log_adulterado(self):
+        linhas = self.caminho.read_text(encoding='utf-8').splitlines()
+        linhas[1] = linhas[1].replace('evento', 'EVENTO')
+        self.caminho.write_text('\n'.join(linhas) + '\n', encoding='utf-8')
+        with self.assertRaises(CommandError):
+            self.emitir()
+        self.assertFalse(self.ancoras_local.exists())
+
+    def test_nao_emite_ancora_de_log_vazio(self):
+        self.caminho.unlink()
+        with self.assertRaises(CommandError):
+            self.emitir()
+
+    def test_email_leva_a_ancora_pra_fora_do_servidor(self):
+        self.emitir('--email', 'guardiao@exemplo.com')
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['guardiao@exemplo.com'])
+        self.assertIn(self.linha_da_ancora(), mail.outbox[0].body)
+
+    def test_ancora_nao_contem_a_chave(self):
+        self.emitir()
+        texto = self.linha_da_ancora()
+        self.assertNotIn(CHAVE_TESTE, texto)
+        self.assertNotIn(base64.b64decode(CHAVE_TESTE).decode(), texto)
+
+    def test_ler_ancoras_ignora_comentarios_e_linhas_soltas(self):
+        valida = gerar_ancora(
+            CHAVE_TESTE, 3, 'b' * 64, '2026-01-01T00:00:00+00:00')
+        ancoras, problemas = ler_ancoras(
+            f'# minhas ancoras\n\n{valida}\nqualquer coisa\n', CHAVE_TESTE)
+        self.assertEqual(len(ancoras), 1)
+        self.assertEqual(problemas, [])
+
+    def test_tela_mostra_o_corte_do_final(self):
+        self.emitir()
+        self.cortar_final(3)
+        admin = Usuario.objects.create_user(
+            username='admin_ancora', password='Senha@12345', is_staff=True)
+        self.client.force_login(admin)
+        for rota in ('auditoria:integridade', 'auditoria:eventos'):
+            with self.subTest(rota=rota):
+                resposta = self.client.get(reverse(rota))
+                self.assertContains(resposta, 'apagadas')
+
+    def test_tela_avisa_quando_nao_ha_ancora(self):
+        admin = Usuario.objects.create_user(
+            username='admin_sem', password='Senha@12345', is_staff=True)
+        self.client.force_login(admin)
+        resposta = self.client.get(reverse('auditoria:integridade'))
+        self.assertContains(resposta, 'Nenhuma âncora conferida')

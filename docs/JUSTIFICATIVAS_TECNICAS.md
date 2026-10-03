@@ -463,3 +463,42 @@ o Django já envia, para os navegadores que seguem só a CSP.
 e não precisaram de exceção. O teste `test_nenhuma_tela_depende_de_codigo_dentro_do_html`
 percorre a aplicação e o admin procurando script, estilo e manipuladores de evento
 escritos dentro do HTML.
+
+## 16. Âncoras para o corte do final do log
+
+**Onde:** `auditoria/integridade.py`, `auditoria/ancoras.py` e os comandos
+`emitir_ancora` e `verificar_logs`
+
+A cadeia de HMAC (seção 11) detecta alteração no meio do log, mas não o corte
+do final: quem apaga as últimas linhas deixa uma cadeia menor e ainda válida.
+Isso já era um limite documentado. A âncora o trata, dentro do que um sistema
+sem servidor externo consegue.
+
+**Por que âncora e não só guardar o último MAC:** o último MAC avisa se o
+final mudou, mas não diz se o log foi só estendido. A âncora guarda também o
+número da linha, então o log pode crescer e a âncora continua valendo: a
+verificação exige apenas que a linha N ainda tenha a assinatura registrada.
+Essa conferência também pega o log reescrito inteiro por quem tem a chave, com o
+mesmo tamanho, o que a cadeia sozinha não pega.
+
+**Por que a âncora é assinada:** ela é guardada em lugares onde outras
+pessoas podem escrever, como e-mail e arquivos de texto. Sem assinatura, bastaria
+inventar uma âncora com número de linhas absurdo para derrubar a verificação, ou
+trocar uma verdadeira por uma antiga. A assinatura usa a chave do log e
+`hmac.compare_digest`, como a cadeia.
+
+**Por que uma âncora inválida reprova:** ignorá-la deixaria quem a adulterou
+sem consequência.
+
+**Por que o envio por e-mail:** a âncora só protege se estiver fora do
+servidor que o atacante controla, e o projeto já tem e-mail configurado. Ela não
+contém a chave nem texto do log, só um número, uma assinatura e uma data.
+
+**O que a solução não resolve:** o que foi apagado depois da última âncora, e
+a âncora guardada só no servidor, que cai junto. Por isso o comando avisa quando
+não há âncora e a documentação pede a cópia externa. Agendar a emissão e guardar
+as mensagens fica por conta de quem opera o servidor.
+
+**Por que recusar emitir âncora de log adulterado ou vazio:** ancorar um
+log já adulterado carimbaria o estrago como válido, e ancorar um log vazio
+não prova nada.

@@ -11,9 +11,22 @@
     <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
       Log íntegro: {{ resultado.total_linhas }} linha{{ resultado.total_linhas|pluralize }} verificada{{ resultado.total_linhas|pluralize }}.
     </div>
+    {% if resultado.ancoras_conferidas %}
+      <p class="mb-4 text-sm text-slate-700">
+        {{ resultado.ancoras_conferidas }} âncora{{ resultado.ancoras_conferidas|pluralize }} conferida{{ resultado.ancoras_conferidas|pluralize }}: o final do log não foi cortado.
+      </p>
+    {% else %}
+      <div class="mb-4 rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+        Nenhuma âncora conferida. Apagar as últimas linhas do log, ou o arquivo inteiro, não seria detectado. Emita uma âncora com <code>manage.py emitir_ancora</code> e guarde fora do servidor.
+      </div>
+    {% endif %}
   {% else %}
     <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-      <p class="font-medium">Log alterado na linha {{ resultado.linha_com_problema }}.</p>
+      {% if resultado.linha_com_problema %}
+        <p class="font-medium">Log alterado na linha {{ resultado.linha_com_problema }}.</p>
+      {% else %}
+        <p class="font-medium">Log alterado.</p>
+      {% endif %}
       <p>{{ resultado.motivo }}</p>
     </div>
   {% endif %}

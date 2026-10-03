@@ -191,18 +191,89 @@ class ResultadoVerificacao:
     linha_com_problema: int | None = None
     motivo: str | None = None
     ultimo_mac: str = MAC_INICIAL
+    ancoras_conferidas: int = 0
 
 
-def verificar_arquivo(caminho, chave_base64):
-    """Refaz a cadeia desde a primeira linha e para no primeiro problema."""
+SEPARADOR_ASSINATURA = ' | sig='
+
+
+@dataclass
+class Ancora:
+    """Foto da cadeia num instante: quantas linhas havia e qual era a
+    assinatura da última."""
+    linhas: int
+    mac: str
+    em: str
+
+
+def _assinar_ancora(chave, linhas, mac, em):
+    mensagem = f'ancora|{linhas}|{mac}|{em}'.encode('utf-8')
+    return hmac.new(chave, mensagem, hashlib.sha256).hexdigest()
+
+
+def gerar_ancora(chave_base64, linhas, mac, em):
+    """Texto de uma âncora, assinado com a mesma chave do log.
+
+    A cadeia sozinha não prova que o FINAL do log está inteiro: quem apaga
+    as últimas linhas (ou o arquivo todo) deixa o que sobrou válido. Uma
+    âncora guardada FORA do servidor fecha essa lacuna: depois, o log só
+    confere se ainda tem aquelas linhas e a mesma assinatura na linha N.
+
+    A assinatura impede forjar uma âncora sem a chave, o que importa porque
+    ela é guardada em lugares onde outras pessoas podem escrever.
+    """
+    chave = decodificar_chave(chave_base64)
+    sig = _assinar_ancora(chave, linhas, mac, em)
+    return f'ancora linhas={linhas} mac={mac} em={em}{SEPARADOR_ASSINATURA}{sig}'
+
+
+def ler_ancoras(texto, chave_base64):
+    """Lê as âncoras de um texto (uma por linha). Devolve (ancoras,
+    problemas). Linhas que não começam com "ancora " são ignoradas, pra
+    o arquivo poder ter comentários."""
+    chave = decodificar_chave(chave_base64)
+    ancoras, problemas = [], []
+    for numero, linha in enumerate(texto.splitlines(), start=1):
+        linha = linha.strip()
+        if not linha.startswith('ancora '):
+            continue
+        corpo, _, sig = linha.partition(SEPARADOR_ASSINATURA)
+        try:
+            campos = dict(parte.split('=', 1) for parte in corpo.split()[1:])
+            ancora = Ancora(int(campos['linhas']), campos['mac'], campos['em'])
+        except (KeyError, ValueError):
+            problemas.append(f'âncora ilegível na linha {numero}')
+            continue
+        esperado = _assinar_ancora(chave, ancora.linhas, ancora.mac, ancora.em)
+        if not hmac.compare_digest(esperado, sig):
+            problemas.append(
+                f'âncora com assinatura inválida na linha {numero} '
+                f'(adulterada ou feita com outra chave)')
+            continue
+        ancoras.append(ancora)
+    return ancoras, problemas
+
+
+def verificar_arquivo(caminho, chave_base64, ancoras=()):
+    """Refaz a cadeia desde a primeira linha e para no primeiro problema.
+
+    Com âncoras, confere também que o final do log não foi cortado."""
     chave = decodificar_chave(chave_base64)
     caminho = Path(caminho)
+    ancoras = list(ancoras)
 
     if not caminho.exists():
+        if ancoras:
+            return ResultadoVerificacao(
+                False, 0, None,
+                'o arquivo de log não existe, mas há âncoras que provam '
+                'que ele já teve linhas (arquivo apagado ou movido)')
         return ResultadoVerificacao(integro=True, total_linhas=0)
 
     mac_anterior = MAC_INICIAL
     total = 0
+    precisadas = {a.linhas for a in ancoras}
+    macs_das_ancoras = {}
     with caminho.open(encoding='utf-8') as arquivo:
         for numero, linha in enumerate(arquivo, start=1):
             linha = linha.rstrip('\n')
@@ -228,5 +299,22 @@ def verificar_arquivo(caminho, chave_base64):
                     mac_anterior,
                 )
             mac_anterior = mac
+            if numero in precisadas:
+                macs_das_ancoras[numero] = mac
 
-    return ResultadoVerificacao(True, total, ultimo_mac=mac_anterior)
+    for ancora in sorted(ancoras, key=lambda a: a.linhas):
+        if ancora.linhas > total:
+            return ResultadoVerificacao(
+                False, total, None,
+                f'o log tem {total} linhas, e a âncora de {ancora.em} prova '
+                f'que já teve {ancora.linhas} (linhas do final foram apagadas)',
+                mac_anterior)
+        if macs_das_ancoras.get(ancora.linhas) != ancora.mac:
+            return ResultadoVerificacao(
+                False, total, ancora.linhas,
+                f'a linha {ancora.linhas} não é a que a âncora de '
+                f'{ancora.em} registrou (log reescrito)',
+                mac_anterior)
+
+    return ResultadoVerificacao(
+        True, total, ultimo_mac=mac_anterior, ancoras_conferidas=len(ancoras))

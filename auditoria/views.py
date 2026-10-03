@@ -6,8 +6,8 @@ from django.shortcuts import render
 
 from usuarios.decoradores import exige_gestor
 
+from .ancoras import verificar_com_ancoras
 from .eventos import CATEGORIAS, LIMITE_DE_LINHAS, NIVEIS, filtrar, ler_eventos
-from .integridade import verificar_arquivo
 
 EVENTOS_POR_PAGINA = 50
 
@@ -19,9 +19,7 @@ def integridade(request):
     Só administradores acessam: o resultado indica onde o log foi
     mexido, informação útil pra um invasor tentar esconder rastros.
     """
-    resultado = verificar_arquivo(
-        settings.LOG_DIR / 'seguranca.log', settings.CHAVE_INTEGRIDADE_LOGS
-    )
+    resultado = verificar_com_ancoras()
     return render(request, 'auditoria/integridade.html', {'resultado': resultado})
 
 
@@ -38,7 +36,7 @@ def eventos(request):
     pediria pra confiar no arquivo sem poder conferir.
     """
     caminho = settings.LOG_DIR / 'seguranca.log'
-    resultado = verificar_arquivo(caminho, settings.CHAVE_INTEGRIDADE_LOGS)
+    resultado = verificar_com_ancoras()
 
     todos, total_de_linhas = ler_eventos(
         caminho, primeira_quebra=resultado.linha_com_problema,
