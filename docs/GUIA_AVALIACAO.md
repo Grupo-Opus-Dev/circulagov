@@ -140,7 +140,8 @@ qual item está no [README da raiz](../README.md).
 
 ## Testes automatizados
 
-117 testes cobrindo os cinco blocos. Para rodar, com o projeto instalado:
+192 testes (em 03/10/2026) cobrindo os cinco blocos, executados a cada push pelo GitHub Actions.
+Para rodar, com o projeto instalado:
 
 ```bash
 python manage.py test

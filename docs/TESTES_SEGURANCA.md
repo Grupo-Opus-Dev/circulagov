@@ -93,6 +93,93 @@ log de segurança pra esconder um incidente.
 | `test_quebra_de_linha_na_mensagem_nao_forja_linha_nova` | `auditoria/tests.py` (`CadeiaDeIntegridadeTests`) | Um username malicioso com quebra de linha não consegue forjar uma linha extra (log injection) |
 | `test_linha_sem_assinatura_e_detectada` | `auditoria/tests.py` (`CadeiaDeIntegridadeTests`) | Uma linha acrescentada na mão, sem assinatura, é rejeitada |
 
+## 7. Controle de acesso à gestão de contas
+
+**Ameaça:** um usuário comum, ou alguém sem login, abrir as telas que mostram
+e alteram os dados de todas as contas.
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_sem_login_vai_pro_login_da_aplicacao` | `usuarios/tests.py` (`TesteAcessoAGestaoDeUsuarios`) | Sem login, as rotas de gestão mandam para a tela de entrar da aplicação, e não para a do admin do Django |
+| `test_usuario_comum_recebe_403` | `usuarios/tests.py` (`TesteAcessoAGestaoDeUsuarios`) | Quem está logado sem o perfil de gestão recebe 403 nas três rotas |
+| `test_usuario_staff_entra` | `usuarios/tests.py` (`TesteAcessoAGestaoDeUsuarios`) | O perfil de gestão abre as três rotas |
+| `test_usuario_comum_nao_remove_2fa_de_ninguem` | `usuarios/tests.py` (`TesteRemocaoDoDoisFatores`) | Um usuário comum não consegue remover o segundo fator de outra conta |
+| `test_so_por_post` | `usuarios/tests.py` (`TesteRemocaoDoDoisFatores`) | Remover o 2FA exige POST, não pode ser disparado por um link |
+| `test_remocao_vai_pro_log_como_aviso` | `usuarios/tests.py` (`TesteRemocaoDoDoisFatores`) | A remoção entra no log como aviso, com o nome de quem a fez, porque reduz a proteção da conta |
+| `test_nao_pode_remover_o_proprio_acesso_de_gestao` | `usuarios/tests.py` (`TesteEdicaoDeUsuario`) | Ninguém rebaixa a si mesmo, o que deixaria o sistema sem administrador |
+| `test_nao_pode_desativar_a_propria_conta` | `usuarios/tests.py` (`TesteEdicaoDeUsuario`) | Pelo mesmo motivo, ninguém desativa a própria conta |
+| `test_desativar_impede_o_login` | `usuarios/tests.py` (`TesteEdicaoDeUsuario`) | Uma conta desativada não consegue entrar |
+| `test_edicao_vai_pro_log_de_seguranca` | `usuarios/tests.py` (`TesteEdicaoDeUsuario`) | Toda alteração de conta fica registrada com o autor |
+
+## 8. Cadastro por convite e senha na redefinição
+
+**Ameaça:** quem cadastra conhecer a senha de quem foi cadastrado, e a tela de
+redefinição aceitar senhas fracas.
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_conta_nasce_sem_senha_utilizavel` | `usuarios/tests.py` (`TesteCadastroComLinkDeSenha`) | No modo de convite a conta é criada sem senha, então ninguém a conhece |
+| `test_fluxo_completo_do_convite_ate_o_login` | `usuarios/tests.py` (`TesteCadastroComLinkDeSenha`) | Cadastro, e-mail, link, senha escolhida pela pessoa e login, de ponta a ponta |
+| `test_falha_no_email_nao_esconde_o_problema` | `usuarios/tests.py` (`TesteCadastroComLinkDeSenha`) | Se o e-mail falhar, a conta fica criada e a tela avisa, em vez de parecer que deu certo |
+| `test_senha_curta_e_recusada` | `recuperacao_senha/tests.py` (`TesteValidadoresNaRedefinicao`) | A redefinição passa a aplicar os validadores de senha do projeto |
+| `test_senha_recusada_nao_queima_o_token` | `recuperacao_senha/tests.py` (`TesteValidadoresNaRedefinicao`) | Errar a senha não obriga a pedir outro link |
+| `test_recusa_vai_pro_log_sem_a_senha` | `recuperacao_senha/tests.py` (`TesteValidadoresNaRedefinicao`) | A recusa é registrada sem gravar a senha digitada |
+
+A redefinição aceitava qualquer senha, até `1`, porque só conferia se as duas
+digitadas eram iguais. Foi descoberto ao implementar o convite. Os seis testes da
+classe `TesteValidadoresNaRedefinicao`, e não só os três da tabela, foram rodados
+contra o código antigo e todos falharam.
+
+## 9. Falhas que só aparecem em produção
+
+**Ameaça:** proteções que funcionam com um processo, como em desenvolvimento, e
+deixam de funcionar com os três workers do Gunicorn.
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_quatro_processos_gravando_ao_mesmo_tempo` | `auditoria/tests.py` (`CadeiaComVariosProcessosTests`) | Quatro processos disputando o log não quebram a cadeia nem perdem linhas |
+| `test_handlers_alternando_no_mesmo_arquivo_mantem_a_cadeia` | `auditoria/tests.py` (`CadeiaComVariosProcessosTests`) | A cadeia vive no arquivo, não na memória de cada processo |
+| `test_ultima_linha_maior_que_o_bloco_de_leitura` | `auditoria/tests.py` (`CadeiaComVariosProcessosTests`) | Uma linha longa não é assinada em cima de uma leitura cortada |
+| `test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio` | `usuarios/tests.py` (`TesteDescarteDoCacheDeBloqueio`) | Demonstra o mecanismo: com limite baixo, tentativas com nomes inventados apagam o contador de uma conta |
+| `test_limite_folgado_preserva_o_contador` | `usuarios/tests.py` (`TesteDescarteDoCacheDeBloqueio`) | Com limite alto o contador sobrevive |
+| `test_configuracao_de_producao_tem_limite_folgado` | `usuarios/tests.py` (`TesteDescarteDoCacheDeBloqueio`) | Lê o settings de produção e garante que o limite não foi removido |
+
+Os dois defeitos foram encontrados depois do deploy. O primeiro apareceu na
+própria tela de integridade, que acusou "Log alterado" sem ninguém ter mexido
+no arquivo. O segundo, ao documentar o cache. O relato de cada um está em
+[INTEGRIDADE_LOGS.md](INTEGRIDADE_LOGS.md) e em
+[JUSTIFICATIVAS_TECNICAS.md](JUSTIFICATIVAS_TECNICAS.md), seção 5.
+
+## 10. Tela de eventos do log
+
+**Ameaça:** conteúdo digitado por um atacante virar código na tela do
+administrador, e uma lista de log que pede confiança sem permitir conferência.
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_html_digitado_pelo_usuario_nao_e_executado` | `auditoria/tests.py` (`ListaDeEventosTests`) | Um `<script>` digitado como nome de usuário aparece escapado, não executa |
+| `test_log_adulterado_aparece_na_lista_e_marca_o_que_vem_depois` | `auditoria/tests.py` (`ListaDeEventosTests`) | Da primeira quebra da cadeia em diante, nenhuma linha é apresentada como confirmada |
+| `test_linha_fora_do_formato_aparece_em_vez_de_sumir` | `auditoria/tests.py` (`ListaDeEventosTests`) | Uma linha estranha é mostrada, não escondida |
+| `test_usuario_comum_recebe_403` | `auditoria/tests.py` (`ListaDeEventosTests`) | Só o perfil de gestão abre a tela |
+
+Os testes de escape e de marcação da cadeia foram conferidos quebrando o código
+de propósito: com o escape desligado e com a marcação sempre verdadeira, ambos
+falham.
+
+## Execução contínua
+
+Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,
+a cada push na `main` e a cada Pull Request. O fluxo sobe um PostgreSQL 17
+descartável, instala as dependências, gera chaves de teste na hora, roda a suíte,
+valida a configuração de produção com `DEBUG=False` e confere se há migração
+pendente.
+
+A `main` está configurada para recusar o merge de um Pull Request cuja checagem
+`testes` não esteja verde. Quem é administrador do repositório ainda pode contornar a
+regra, de propósito e com uma ação explícita, para o caso de emergência. O
+histórico de execuções, com data, hora e log de cada uma, fica em
+https://github.com/Grupo-Opus-Dev/circulagov/actions.
+
 ## Como rodar tudo
 
 ```bash
@@ -100,6 +187,10 @@ python manage.py test
 ```
 
 ## Resultados da execução
+
+O registro abaixo é de uma execução datada. Desde então a suíte cresceu, e em
+03/10/2026 tem 192 testes. A execução mais recente, com resultado e log, está
+sempre na aba Actions do repositório.
 
 Execução real em **24/09/2026**, com **Python 3.13.15** e **Django
 5.2.17**.
