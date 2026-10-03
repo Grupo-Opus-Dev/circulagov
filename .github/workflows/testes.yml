@@ -1,0 +1,110 @@
+name: Testes
+
+# Roda a suite completa a cada push na main e a cada Pull Request.
+# O resultado aparece no proprio PR, e a main pode ser configurada pra
+# recusar merge com teste vermelho.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# So leitura do repositorio. O workflow nao precisa escrever nada, e
+# quanto menos permissao, menos estrago se algo der errado.
+permissions:
+  contents: read
+
+# Um push novo no mesmo PR cancela a execucao anterior, que ja nao
+# interessa mais.
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      # Banco descartavel, criado e destruido a cada execucao. Os testes
+      # rodam contra PostgreSQL de verdade, a mesma versao da producao, e
+      # nao contra um substituto.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: circulagov_ci
+          POSTGRES_PASSWORD: senha_so_do_ci
+          POSTGRES_DB: circulagov_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U circulagov_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Instalar as dependencias
+        run: pip install -r requirements.txt
+
+      - name: Gerar chaves descartaveis
+        # As chaves de producao nunca entram no CI. Estas nascem aqui, a
+        # cada execucao, e morrem junto com a maquina. O GITHUB_ENV
+        # repassa os valores aos passos seguintes.
+        run: |
+          {
+            echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
+            echo "CHAVE_CIFRAGEM_2FA=$(python -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
+            echo "CHAVE_INTEGRIDADE_LOGS=$(python -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
+          } >> "$GITHUB_ENV"
+
+      - name: Rodar os testes
+        env:
+          # DEBUG=True de proposito. Com False, o SECURE_SSL_REDIRECT
+          # responde 301 pra toda requisicao do teste, e a suite inteira
+          # falha. Os testes foram escritos pra rodar como em
+          # desenvolvimento.
+          DEBUG: 'True'
+          DB_NAME: circulagov_ci
+          DB_USER: circulagov_ci
+          DB_PASSWORD: senha_so_do_ci
+          DB_HOST: localhost
+          DB_PORT: 5432
+        run: python manage.py test --no-input --verbosity 2
+
+      - name: Checar a configuracao de producao
+        # Aqui o DEBUG e False, ao contrario do passo dos testes, porque
+        # a ideia e validar o bloco de producao do settings.py: HSTS,
+        # cookies seguros, redirecionamento pra HTTPS. Qualquer aviso
+        # derruba o passo, entao remover uma dessas protecoes sem
+        # querer deixa de passar despercebido.
+        env:
+          DEBUG: 'False'
+          ALLOWED_HOSTS: circulagov.nossoprojeto.app.br
+          DB_NAME: circulagov_ci
+          DB_USER: circulagov_ci
+          DB_PASSWORD: senha_so_do_ci
+          DB_HOST: localhost
+          DB_PORT: 5432
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: Verificar se ha migracao pendente
+        # Pega o esquecimento de rodar makemigrations: o model mudou,
+        # mas o arquivo de migracao nao foi gerado, e em producao o
+        # banco ficaria diferente do codigo.
+        env:
+          DEBUG: 'True'
+          DB_NAME: circulagov_ci
+          DB_USER: circulagov_ci
+          DB_PASSWORD: senha_so_do_ci
+          DB_HOST: localhost
+          DB_PORT: 5432
+        run: python manage.py makemigrations --check --dry-run
