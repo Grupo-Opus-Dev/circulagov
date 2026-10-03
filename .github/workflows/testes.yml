@@ -108,3 +108,18 @@ jobs:
           DB_HOST: localhost
           DB_PORT: 5432
         run: python manage.py makemigrations --check --dry-run
+
+  nginx:
+    # Sobe um nginx de verdade, num container, com os mesmos arquivos de
+    # limite que vao pro servidor, e confere que o 429 aparece onde deve e
+    # nao aparece onde nao deve. Sem isto, a configuracao so seria testada
+    # na primeira vez que alguem a recarregasse no servidor.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v7
+
+      - name: Testar os limites de requisicoes
+        run: bash deploy/nginx/testar-limites.sh
