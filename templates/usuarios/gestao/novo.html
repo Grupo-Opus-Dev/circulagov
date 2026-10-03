@@ -28,8 +28,27 @@
         </div>
       {% endif %}
 
-      <div>
-        {% if campo.name == 'is_staff' %}
+      <div {% if campo.name == 'password1' or campo.name == 'password2' %}data-senha-manual{% endif %}>
+        {% if campo.name == 'usable_password' %}
+          <p class="block text-sm font-medium text-slate-700 mb-2">{{ campo.label }}</p>
+          <div class="space-y-2">
+            {% for opcao in campo %}
+              <label for="{{ opcao.id_for_label }}" class="flex items-start gap-2 rounded-md border border-slate-200 px-3 py-2.5 cursor-pointer hover:bg-slate-50 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+                {{ opcao.tag }}
+                <span>
+                  <span class="block text-sm text-slate-800">{{ opcao.choice_label }}</span>
+                  <span class="block text-xs text-slate-500">
+                    {% if opcao.data.value == 'false' %}
+                      Recomendado. A conta nasce sem senha e ninguém além da pessoa fica sabendo qual ela escolheu.
+                    {% else %}
+                      Para conta cujo e-mail não recebe mensagem. Você passa a conhecer a senha.
+                    {% endif %}
+                  </span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        {% elif campo.name == 'is_staff' %}
           <label for="{{ campo.id_for_label }}" class="flex items-start gap-2 cursor-pointer">
             {{ campo }}
             <span>
@@ -69,4 +88,23 @@
     <a href="{% url 'usuarios:gestao_lista' %}" class="text-blue-700 hover:underline">Voltar para a lista</a>
   </p>
 </div>
+
+<script>
+  // Esconde os campos de senha quando a escolha é enviar o link. Sem
+  // JavaScript o formulário continua funcionando: os campos só ficam
+  // visíveis, e o servidor ignora o que vier neles no modo de link.
+  (function () {
+    var campos = document.querySelectorAll('[data-senha-manual]');
+    var opcoes = document.querySelectorAll('input[name="usable_password"]');
+
+    function atualizar() {
+      var marcada = document.querySelector('input[name="usable_password"]:checked');
+      var manual = marcada && marcada.value === 'true';
+      campos.forEach(function (campo) { campo.hidden = !manual; });
+    }
+
+    opcoes.forEach(function (opcao) { opcao.addEventListener('change', atualizar); });
+    atualizar();
+  })();
+</script>
 {% endblock %}

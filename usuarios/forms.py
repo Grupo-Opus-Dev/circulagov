@@ -1,6 +1,9 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import BaseUserCreationForm
+from django.contrib.auth.forms import (
+    BaseUserCreationForm,
+    SetUnusablePasswordMixin,
+)
 
 from alunos.models import Aluno
 
@@ -12,16 +15,37 @@ CLASSE_CAMPO = (
 )
 
 
-class FormularioNovoUsuario(BaseUserCreationForm):
+MODO_LINK = 'false'
+MODO_DEFINIR_AGORA = 'true'
+
+
+class FormularioNovoUsuario(SetUnusablePasswordMixin, BaseUserCreationForm):
     """Cadastro de usuário pela área de gestão.
 
     Herda de BaseUserCreationForm para aproveitar a confirmação de senha
     e os validadores do projeto, em vez de reimplementar essa parte.
 
+    O SetUnusablePasswordMixin, também do Django, é o que permite criar
+    a conta sem senha utilizável. É o mesmo mecanismo que o admin usa.
+    No modo padrão a conta nasce assim e a pessoa recebe um link para
+    criar a própria senha: quem cadastra nunca chega a conhecer nenhuma.
+
     O e-mail é obrigatório aqui, diferente do Usuario em geral, porque
     sem ele a pessoa não consegue recuperar a própria senha, e quem
     cadastra não deveria ser o único caminho de volta.
     """
+
+    # Os valores "true" e "false" são os que o mixin do Django espera.
+    usable_password = forms.ChoiceField(
+        label='Senha',
+        required=False,
+        initial=MODO_LINK,
+        choices=[
+            (MODO_LINK, 'Enviar link para a pessoa criar a própria senha'),
+            (MODO_DEFINIR_AGORA, 'Definir a senha agora'),
+        ],
+        widget=forms.RadioSelect,
+    )
 
     email = forms.EmailField(label='E-mail', required=True)
 
@@ -37,14 +61,24 @@ class FormularioNovoUsuario(BaseUserCreationForm):
     )
     nome_completo = forms.CharField(label='Nome completo', required=False)
 
+    field_order = [
+        'username', 'email', 'usable_password', 'password1', 'password2',
+        'is_staff', 'ra', 'nome_completo',
+    ]
+
     class Meta(BaseUserCreationForm.Meta):
         model = Usuario
         fields = ('username', 'email')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # No modo de link as senhas ficam em branco. O mixin volta a
+        # exigi-las sozinho quando o modo escolhido é definir agora.
+        self.fields['password1'].required = False
+        self.fields['password2'].required = False
+
         for nome, campo in self.fields.items():
-            if nome == 'is_staff':
+            if nome in ('is_staff', 'usable_password'):
                 continue
             campo.widget.attrs['class'] = CLASSE_CAMPO
 
