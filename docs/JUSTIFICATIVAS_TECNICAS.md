@@ -137,8 +137,8 @@ tentativas com nomes distintos dentro de 15 minutos, algo como 110
 requisições por segundo sustentadas.
 
 A defesa complementar é um limite de requisições por endereço no nginx. A
-configuração, com teste automatizado, está em `deploy/nginx/` e **só vale
-depois de instalada no nginx do servidor**, passo descrito em
+configuração, com teste automatizado, está em `deploy/nginx/`, foi instalada
+no nginx do servidor em 03/10/2026 e conferida de fora, como descrito em
 [DEPLOY.md](DEPLOY.md). Ela encarece o ataque, mas não o elimina: quem usa
 muitos endereços passa por ela.
 
