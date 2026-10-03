@@ -132,6 +132,14 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Indisponibilidade da recuperação de senha e incômodo ao titular da conta.
 
+### 17. Corte do final do log de segurança
+
+**Descrição:** A cadeia de assinaturas detecta alteração no meio do log, mas não percebe que as últimas linhas foram apagadas, nem que o arquivo inteiro sumiu: o que sobra continua válido. Quem consegue escrever no servidor poderia esconder os eventos mais recentes, justamente os do próprio ataque.
+
+**Ativo afetado:** Log de segurança e a capacidade de auditar incidentes.
+
+**Impacto:** Perda de rastros sem que a verificação de integridade acuse.
+
 ### Lacunas identificadas
 
 Além das ameaças já consideradas pelo projeto, outras ameaças podem ser identificadas durante a análise. Quando uma ameaça ainda não possui uma proteção implementada, ela deve ser registrada como uma lacuna de segurança para avaliação posterior.
@@ -141,6 +149,7 @@ Lacunas conhecidas hoje:
 - a verificação do segundo fator e o pedido de recuperação de senha não têm trava de tentativas por conta no código (ameaças 10 e 12)
 - o limite de requisições por endereço não barra um ataque distribuído por muitos endereços
 - não há backup do banco nem do log de segurança
+- a emissão de âncoras do log não está agendada, e a cópia fora do servidor depende de alguém guardar as mensagens (ameaça 17)
 
 ## 6.8 Risco x Contramedida
 
@@ -313,3 +322,17 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 **Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
 
 **Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.
+
+### 17. Corte do final do log de segurança
+
+**Probabilidade:** Baixa
+
+**Impacto:** Média
+
+**Risco resultante:** Médio
+
+**Contramedida implementada:** Âncoras do log (`emitir_ancora`): o número de linhas e a assinatura da última, assinados com a chave do log e enviáveis por e-mail para fora do servidor. A verificação reprova se o log tem menos linhas, se a linha ancorada mudou ou se o arquivo sumiu.
+
+**Onde está no código:** `auditoria/integridade.py` (`gerar_ancora`, `ler_ancoras`, `verificar_arquivo`), `auditoria/ancoras.py` e os comandos `emitir_ancora` e `verificar_logs`. Os testes estão em `AncorasDoLogTests`, em `auditoria/tests.py`.
+
+**Risco residual:** Médio. Só detecta o que foi apagado antes da última âncora, e a proteção real depende de uma cópia fora do servidor, que ainda precisa ser agendada e guardada por alguém. A âncora guardada só no servidor pode ser apagada junto com o final do log, sem alarme.

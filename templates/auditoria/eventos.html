@@ -12,14 +12,18 @@
 
   {% if resultado.integro %}
     <div class="mb-6 flex items-center justify-between gap-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
-      <span>Cadeia íntegra: {{ resultado.total_linhas }} linha{{ resultado.total_linhas|pluralize }} verificada{{ resultado.total_linhas|pluralize }}.</span>
+      <span>Cadeia íntegra: {{ resultado.total_linhas }} linha{{ resultado.total_linhas|pluralize }} verificada{{ resultado.total_linhas|pluralize }}{% if resultado.ancoras_conferidas %}, {{ resultado.ancoras_conferidas }} âncora{{ resultado.ancoras_conferidas|pluralize }} conferida{{ resultado.ancoras_conferidas|pluralize }}{% endif %}.</span>
       <a href="{% url 'auditoria:integridade' %}" class="shrink-0 underline">Detalhes</a>
     </div>
   {% else %}
     <div class="mb-6 flex items-center justify-between gap-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
       <span>
-        <strong>Cadeia quebrada na linha {{ resultado.linha_com_problema }}.</strong>
-        As linhas marcadas com "?" vêm depois da quebra e não podem ser confirmadas.
+        {% if resultado.linha_com_problema %}
+          <strong>Cadeia quebrada na linha {{ resultado.linha_com_problema }}.</strong>
+          As linhas marcadas com "?" vêm depois da quebra e não podem ser confirmadas.
+        {% else %}
+          <strong>Log alterado.</strong> {{ resultado.motivo }}
+        {% endif %}
       </span>
       <a href="{% url 'auditoria:integridade' %}" class="shrink-0 underline">Detalhes</a>
     </div>
