@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import time
+from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -724,3 +725,103 @@ class TesteDescarteDoCacheDeBloqueio(TestCase):
             env=ambiente, capture_output=True, text=True, timeout=60)
         self.assertEqual(resultado.returncode, 0, resultado.stderr)
         self.assertGreaterEqual(int(resultado.stdout.strip()), 50_000)
+
+
+class TesteBloqueioDeLoginPorEndereco(TestCase):
+    """O bloqueio vale por par (usuário, endereço) e tem um teto por conta.
+    Tentativas feitas durante o bloqueio não renovam o prazo. Antes, quem
+    insistia (inclusive a própria vítima) ficava bloqueado pra sempre."""
+
+    def setUp(self):
+        cache.clear()
+        self.senha = 'SenhaDeTeste123'
+        Usuario = get_user_model()
+        self.usuario = Usuario.objects.create_user(
+            username='vitima', password=self.senha)
+        patch = mock.patch('usuarios.views.time.sleep')
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.addCleanup(cache.clear)
+
+    def _tentar(self, senha, ip='10.0.0.1'):
+        return self.client.post(
+            reverse('login'),
+            {'username': 'vitima', 'password': senha},
+            REMOTE_ADDR=ip,
+        )
+
+    def _errar(self, vezes, ip='10.0.0.1'):
+        for _ in range(vezes):
+            self._tentar('errada', ip)
+
+    def test_bloqueio_nao_e_renovado_por_quem_insiste(self):
+        self._errar(5)
+        inicio = time.time()
+        # 30 tentativas durante o bloqueio, uma por minuto.
+        for minuto in range(1, 31):
+            with mock.patch('time.time', return_value=inicio + minuto * 20):
+                self._tentar('errada')
+        # 16 minutos depois do início do bloqueio ele precisa ter acabado,
+        # por mais que se tenha insistido nesse meio tempo.
+        with mock.patch('time.time', return_value=inicio + 16 * 60):
+            resposta = self._tentar(self.senha)
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_senha_certa_depois_do_prazo_entra_mesmo_apos_insistir(self):
+        self._errar(5)
+        self._errar(20)
+        with mock.patch('time.time', return_value=time.time() + 16 * 60):
+            resposta = self._tentar(self.senha)
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_durante_o_bloqueio_a_senha_certa_nao_entra(self):
+        self._errar(5)
+        resposta = self._tentar(self.senha)
+        self.assertEqual(resposta.status_code, 200)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_contador_do_par_nao_passa_do_limite_durante_o_bloqueio(self):
+        self._errar(5)
+        self._errar(10)
+        par = seguranca.chave_cache_par('vitima', '10.0.0.1')
+        self.assertEqual(cache.get(par), seguranca.LIMITE_TENTATIVAS)
+
+    def test_outro_endereco_nao_e_bloqueado_pelos_erros_de_um_so(self):
+        self._errar(5, ip='10.0.0.1')
+        resposta = self._tentar(self.senha, ip='10.0.0.2')
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_teto_por_conta_barra_quem_troca_de_endereco(self):
+        # 5 erros em cada um de 5 enderecos: nenhum par passa de 5, mas a
+        # conta chegou a 25.
+        for numero in range(5):
+            self._errar(5, ip=f'10.0.1.{numero}')
+        resposta = self._tentar(self.senha, ip='10.0.9.9')
+        self.assertEqual(resposta.status_code, 200)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_acerto_zera_so_o_contador_do_par(self):
+        self._errar(3)
+        self._tentar(self.senha)
+        self.assertIsNone(
+            cache.get(seguranca.chave_cache_par('vitima', '10.0.0.1')))
+        self.assertEqual(cache.get(seguranca.chave_cache('vitima')), 3)
+
+    @override_settings(CABECALHO_IP_DO_CLIENTE='HTTP_X_REAL_IP')
+    def test_usa_o_cabecalho_configurado_atras_do_proxy(self):
+        # Todos chegam do proxy (REMOTE_ADDR igual), o endereco real vem no cabecalho.
+        for _ in range(5):
+            self.client.post(
+                reverse('login'),
+                {'username': 'vitima', 'password': 'errada'},
+                REMOTE_ADDR='127.0.0.1', HTTP_X_REAL_IP='203.0.113.7')
+        outro = self.client.post(
+            reverse('login'),
+            {'username': 'vitima', 'password': self.senha},
+            REMOTE_ADDR='127.0.0.1', HTTP_X_REAL_IP='203.0.113.8')
+        self.assertEqual(outro.status_code, 302)
+        mesmo = self.client.post(
+            reverse('login'),
+            {'username': 'vitima', 'password': self.senha},
+            REMOTE_ADDR='127.0.0.1', HTTP_X_REAL_IP='203.0.113.7')
+        self.assertEqual(mesmo.status_code, 200)

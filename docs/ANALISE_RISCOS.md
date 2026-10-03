@@ -132,6 +132,14 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Indisponibilidade da recuperação de senha e incômodo ao titular da conta.
 
+### 14. Bloqueio de login que nunca termina
+
+**Descrição:** Cada tentativa feita durante o bloqueio por força bruta reiniciava o prazo de 15 minutos. Quem continuasse tentando ficava bloqueado indefinidamente. Um atacante podia, por isso, manter uma conta de vítima trancada enviando uma tentativa a cada poucos minutos, e o próprio dono da conta se trancava ao insistir.
+
+**Ativo afetado:** Disponibilidade das contas.
+
+**Impacto:** Negação de acesso a uma conta específica, sem precisar da senha.
+
 ### Lacunas identificadas
 
 Além das ameaças já consideradas pelo projeto, outras ameaças podem ser identificadas durante a análise. Quando uma ameaça ainda não possui uma proteção implementada, ela deve ser registrada como uma lacuna de segurança para avaliação posterior.
@@ -313,3 +321,17 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 **Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
 
 **Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.
+
+### 14. Bloqueio de login que nunca termina
+
+**Probabilidade:** Média
+
+**Impacto:** Média
+
+**Risco resultante:** Médio
+
+**Contramedida implementada:** Tentativas feitas durante o bloqueio não renovam o prazo. O bloqueio passou a valer por par (usuário, endereço), com teto de 25 falhas por conta somando todos os endereços. Assim, um endereço isolado não tranca a conta para os demais, e quem troca de endereço a cada 5 tentativas também é barrado.
+
+**Onde está no código:** `usuarios/seguranca.py`, `usuarios/views.py` e `CABECALHO_IP_DO_CLIENTE` em `config/settings.py`. Os testes estão em `TesteBloqueioDeLoginPorEndereco`, em `usuarios/tests.py`.
+
+**Risco residual:** Médio-baixo. Um atacante com muitos endereços ainda pode manter o teto de 25 da conta atingido e trancar a vítima. O limite protege a conta contra adivinhação, e o custo é essa indisponibilidade temporária.

@@ -142,6 +142,12 @@ if not DEBUG:
     # HTTPS atras de proxy. Sem isso, login e consentimento falham.
     CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
+    # De onde vem o endereco de quem acessa. Atras do nginx o REMOTE_ADDR e
+    # o do proprio proxy, e o bloqueio de login por endereco ficaria igual
+    # pra todo mundo. O nginx sobrescreve o X-Real-IP com o endereco real,
+    # entao o valor nao vem do cliente. Ver docs/DEPLOY.md.
+    CABECALHO_IP_DO_CLIENTE = 'HTTP_X_REAL_IP'
+
     # Em producao o Gunicorn roda com varios workers, e cada processo
     # teria o proprio contador em memoria: 5 tentativas viram 5 por
     # worker. Guardar no banco mantem a contagem unica (requisito 1.11).
