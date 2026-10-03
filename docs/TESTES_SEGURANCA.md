@@ -166,6 +166,90 @@ Os testes de escape e de marcação da cadeia foram conferidos quebrando o códi
 de propósito: com o escape desligado e com a marcação sempre verdadeira, ambos
 falham.
 
+## 11. Admin do Django usa o login da aplicação
+
+**Ameaça:** entrar no `/admin/` só com a senha, sem o segundo fator, e tentar
+senhas sem o bloqueio por tentativas (ameaça 13 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_post_no_login_do_admin_nao_autentica_ninguem` | `usuarios/tests.py` (`TesteAdminUsaOLoginDaAplicacao`) | Enviar usuário e senha ao `/admin/login/` não abre sessão |
+| `test_senha_certa_no_login_da_aplicacao_ainda_nao_abre_o_admin` | idem | Com 2FA ativo, a senha certa não basta para chegar ao admin |
+| `test_depois_do_segundo_fator_o_admin_abre` | idem | Concluído o segundo fator, o admin abre normalmente |
+| `test_gestor_sem_2fa_entra_pelo_login_da_aplicacao` | idem | Quem não ativou o 2FA entra pelo login da aplicação |
+| `test_admin_sem_login_leva_ao_login_da_aplicacao` | idem | Sem sessão, o admin redireciona para o login da aplicação |
+| `test_usuario_comum_logado_recebe_403` | idem | Usuário sem perfil de gestão recebe 403 |
+| `test_next_apontando_pra_site_externo_e_ignorado` | idem | O parâmetro `next` não vira redirecionamento aberto |
+| `test_login_do_admin_nao_conta_nem_registra_tentativa` | idem | O `/admin/login/` não participa do contador de tentativas |
+
+Contra a configuração antiga do admin, quatro desses testes falham, o que mostra
+que eles detectam o problema.
+
+## 12. Bloqueio de login por endereço e sem renovação
+
+**Ameaça:** bloqueio que nunca termina e conta trancada por quem não tem a senha (ameaça 14 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_bloqueio_nao_e_renovado_por_quem_insiste` | `usuarios/tests.py` (`TesteBloqueioDeLoginPorEndereco`) | Com 30 tentativas durante o bloqueio, ele ainda acaba 16 minutos depois do início |
+| `test_senha_certa_depois_do_prazo_entra_mesmo_apos_insistir` | idem | Passado o prazo, a senha certa entra |
+| `test_durante_o_bloqueio_a_senha_certa_nao_entra` | idem | Durante o bloqueio, nem a senha certa abre sessão |
+| `test_contador_do_par_nao_passa_do_limite_durante_o_bloqueio` | idem | Tentativas bloqueadas não somam no contador |
+| `test_outro_endereco_nao_e_bloqueado_pelos_erros_de_um_so` | idem | Erros de um endereço não trancam os outros |
+| `test_teto_por_conta_barra_quem_troca_de_endereco` | idem | 25 falhas espalhadas em 5 endereços bloqueiam a conta |
+| `test_acerto_zera_so_o_contador_do_par` | idem | O teto da conta não é apagado por um login certo |
+| `test_usa_o_cabecalho_configurado_atras_do_proxy` | idem | Em produção o endereço vem do `X-Real-IP` do nginx |
+
+## 13. Trava de tentativas e prazo no segundo fator
+
+**Ameaça:** tentar muitos códigos de 6 dígitos depois de acertar a senha, e deixar a etapa do código aberta (ameaça 10 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_depois_de_5_erros_nem_o_codigo_certo_entra` | `dois_fatores/tests.py` (`TesteTravaDoSegundoFator`) | Com 5 erros a conta fica bloqueada e o código certo não entra |
+| `test_o_bloqueio_vale_mesmo_passando_pela_senha_de_novo` | idem | O contador é da conta, não da sessão |
+| `test_tentativas_durante_o_bloqueio_nao_renovam_o_prazo` | idem | Insistir não prolonga o bloqueio |
+| `test_acerto_zera_a_contagem` | idem | Quem acerta volta ao zero |
+| `test_bloqueio_vai_pro_log` | idem | O bloqueio gera linha no log de segurança |
+| `test_etapa_do_codigo_expira` | idem | Passados 5 minutos, o código certo não entra mais |
+| `test_etapa_expirada_nao_volta_a_valer` | idem | Depois de expirar, é preciso passar pela senha de novo |
+| `test_expiracao_vai_pro_log` | idem | A expiração gera linha no log |
+| `test_dentro_do_prazo_a_etapa_segue_valendo` | idem | Antes dos 5 minutos a tela continua disponível |
+
+## 14. Recuperação de senha: uso simultâneo e limite por conta
+
+**Ameaça:** usar o mesmo link duas vezes ao mesmo tempo, e encher a caixa de e-mail de uma conta (ameaças 15 e 12 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_consumir_so_deixa_um_dos_pedidos_simultaneos_passar` | `recuperacao_senha/tests.py` (`TesteUsoSimultaneoDoToken`) | Com duas threads, só uma consome o token |
+| `test_dois_pedidos_pelo_mesmo_link_so_um_troca_a_senha` | idem | Dois pedidos HTTP simultâneos: um recebe 302, o outro 400, e só uma das senhas fica valendo. Falha com o código antigo |
+| `test_token_expirado_nao_e_consumido` | idem | Token vencido não é consumido |
+| `test_se_a_troca_de_senha_falha_o_token_continua_valendo` | idem | A transação devolve o token se a gravação falha |
+| `test_so_os_3_primeiros_pedidos_da_hora_mandam_e_mail` | `recuperacao_senha/tests.py` (`TesteLimiteDeEmailsPorConta`) | Seis pedidos de endereços diferentes geram só 3 e-mails |
+| `test_resposta_e_a_mesma_com_ou_sem_limite` | idem | O limite não muda a resposta |
+| `test_resposta_para_usuario_inexistente_e_igual_a_de_conta_limitada` | idem | Não dá para descobrir contas pelo limite |
+| `test_limite_de_uma_conta_nao_afeta_outra` | idem | O contador é por conta |
+| `test_pedidos_recusados_nao_renovam_a_janela` | idem | Depois de uma hora, volta a enviar |
+| `test_limite_vai_pro_log` | idem | O limite gera linha no log |
+| `test_convite_da_gestao_nao_conta_no_limite` | idem | O convite criado pela gestão não consome o limite |
+
+## 15. CSS próprio e política de conteúdo
+
+**Ameaça:** código de terceiro ou injetado executando dentro das páginas (ameaça 16 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_toda_resposta_tem_o_cabecalho` | `usuarios/test_csp.py` (`TestePoliticaDeConteudo`) | O cabeçalho `Content-Security-Policy` vem com `script-src 'self'`, `object-src 'none'` e `frame-ancestors 'none'` |
+| `test_politica_nao_libera_codigo_inline_nem_cdn` | idem | A política não tem `unsafe-inline`, `unsafe-eval` nem o CDN do Tailwind |
+| `test_cabecalho_vem_tambem_em_erro_e_redirecionamento` | idem | Respostas 404 e redirecionamentos também levam o cabeçalho |
+| `test_nenhuma_tela_depende_de_codigo_dentro_do_html` | idem | Dezesseis telas, da aplicação e do admin, não têm script, `<style>`, `onclick`, `style=` nem `javascript:` dentro do HTML |
+| `test_nenhum_template_carrega_script_de_terceiro` | idem | Nenhum template usa `<script src>` externo |
+| `test_toda_classe_usada_nos_templates_existe_no_css` | `usuarios/test_csp.py` (`TesteCssDoTailwindVersionado`) | Cada classe usada nos templates e nas strings `CLASSE_*` tem regra em `static/css/tailwind.css` |
+| `test_o_css_nao_depende_do_cdn` | idem | O arquivo de CSS não referencia o CDN |
+
+Conferência manual feita em 03/10/2026: a tela de login abre com o CSS estático, sem o objeto `tailwind` no navegador e sem erros de CSP no console.
+
 ## 16. Âncoras do log
 
 **Ameaça:** apagar o final do log, ou o arquivo inteiro, sem que a verificação acuse (ameaça 17 de `ANALISE_RISCOS.md`).

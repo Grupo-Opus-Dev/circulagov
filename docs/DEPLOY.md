@@ -131,6 +131,22 @@ A **porta 80 precisa ficar aberta permanentemente**. É por ela que o Let's
 Encrypt valida o domínio. Fechar depois quebra a renovação, e o certificado
 vence em 90 dias.
 
+## Política de conteúdo (CSP)
+
+O Django envia `Content-Security-Policy` em toda resposta, e o nginx não
+precisa de configuração para isso. Para conferir de fora:
+
+```bash
+curl -sI https://circulagov.nossoprojeto.app.br/contas/login/ | grep -i content-security
+```
+
+Deve aparecer `script-src 'self'` e nenhum `unsafe-inline`. Se uma tela
+perder o estilo depois de uma mudança, abra o console do navegador: a causa
+mais comum é uma classe do Tailwind nova que não está em
+`static/css/tailwind.css`. O teste `TesteCssDoTailwindVersionado` avisa
+quando isso acontece, e o CSS precisa ser gerado de novo com as classes
+novas.
+
 ## Atualizar depois de um merge na main
 
 ```bash

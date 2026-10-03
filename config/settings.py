@@ -31,7 +31,10 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    # No lugar de 'django.contrib.admin': o login do admin padrao nao passa
+    # pelo segundo fator nem pelo bloqueio de tentativas. Ver
+    # usuarios/admin_site.py.
+    'usuarios.admin_config.AdminCirculaGovConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -59,6 +62,7 @@ MIDDLEWARE = [
     'usuarios.middleware.TimeoutAbsolutoMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'usuarios.middleware.PoliticaDeConteudoMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -141,6 +145,12 @@ if not DEBUG:
     # O Django 4+ exige a origem declarada pra aceitar POST vindo de
     # HTTPS atras de proxy. Sem isso, login e consentimento falham.
     CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+
+    # De onde vem o endereco de quem acessa. Atras do nginx o REMOTE_ADDR e
+    # o do proprio proxy, e o bloqueio de login por endereco ficaria igual
+    # pra todo mundo. O nginx sobrescreve o X-Real-IP com o endereco real,
+    # entao o valor nao vem do cliente. Ver docs/DEPLOY.md.
+    CABECALHO_IP_DO_CLIENTE = 'HTTP_X_REAL_IP'
 
     # Em producao o Gunicorn roda com varios workers, e cada processo
     # teria o proprio contador em memoria: 5 tentativas viram 5 por
@@ -251,6 +261,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# CSS e JavaScript proprios do projeto. O CSS do Tailwind e gerado uma vez e
+# versionado aqui, em vez de ser montado no navegador por script de terceiro.
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Pasta onde o collectstatic junta tudo pro WhiteNoise servir.
 STATIC_ROOT = BASE_DIR / 'staticfiles'

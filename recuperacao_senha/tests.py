@@ -1,9 +1,19 @@
+import threading
+import time
+from unittest import mock
+
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.core import mail
+from django.core.cache import cache
+from django.db import connection
+from django.test import (
+    Client, RequestFactory, TestCase, TransactionTestCase,
+)
 from django.urls import reverse
 from django.utils import timezone
 
 from .models import TokenRecuperacaoSenha
+from .views import enviar_email_recuperacao
 
 Usuario = get_user_model()
 
@@ -303,3 +313,164 @@ class TesteValidadoresNaRedefinicao(TestCase):
         texto = chr(10).join(registro.output)
         self.assertIn('senha_recusada_pelos_validadores', texto)
         self.assertNotIn('Fraca1', texto)
+
+
+class TesteUsoSimultaneoDoToken(TransactionTestCase):
+    """Dois pedidos com o mesmo link, ao mesmo tempo. Antes, os dois
+    conferiam o token antes de qualquer um marcá-lo, e os dois trocavam
+    a senha: o link de uso único servia duas vezes."""
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='corrida', password='SenhaAntiga@123')
+        self.registro, self.valor_bruto = TokenRecuperacaoSenha.gerar(
+            self.usuario)
+        self.url = reverse('recuperacao_senha:redefinir', args=[self.valor_bruto])
+
+    def _rodar_em_paralelo(self, tarefas):
+        resultados = [None] * len(tarefas)
+        erros = []
+
+        def executar(indice):
+            try:
+                resultados[indice] = tarefas[indice]()
+            except Exception as erro:  # noqa: BLE001
+                erros.append(erro)
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=executar, args=(i,))
+                   for i in range(len(tarefas))]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        self.assertEqual(erros, [])
+        return resultados
+
+    def test_consumir_so_deixa_um_dos_pedidos_simultaneos_passar(self):
+        barreira = threading.Barrier(2)
+
+        def tentar():
+            registro = TokenRecuperacaoSenha.objects.get(pk=self.registro.pk)
+            barreira.wait(timeout=10)
+            return registro.consumir()
+
+        resultados = self._rodar_em_paralelo([tentar, tentar])
+        self.assertEqual(sorted(resultados), [False, True])
+
+    def test_dois_pedidos_pelo_mesmo_link_so_um_troca_a_senha(self):
+        # Os dois leem o token antes de qualquer um gravar, que e a
+        # situacao que quebrava o uso unico.
+        barreira = threading.Barrier(2)
+        original = TokenRecuperacaoSenha.buscar_com_motivo
+
+        def buscar_e_esperar(valor_bruto):
+            resposta = original(valor_bruto)
+            barreira.wait(timeout=10)
+            return resposta
+
+        def pedir(senha):
+            def executar():
+                cliente = Client()
+                resposta = cliente.post(self.url, {
+                    'senha_nova': senha, 'confirmacao': senha})
+                return resposta.status_code
+            return executar
+
+        with mock.patch.object(
+                TokenRecuperacaoSenha, 'buscar_com_motivo',
+                side_effect=buscar_e_esperar):
+            resultados = self._rodar_em_paralelo([
+                pedir('PrimeiraSenha@456'), pedir('SegundaSenha@789')])
+
+        self.assertEqual(sorted(resultados), [302, 400])
+        self.usuario.refresh_from_db()
+        senhas_certas = [
+            senha for senha in ('PrimeiraSenha@456', 'SegundaSenha@789')
+            if self.usuario.check_password(senha)]
+        self.assertEqual(len(senhas_certas), 1)
+
+    def test_token_expirado_nao_e_consumido(self):
+        self.registro.expira_em = timezone.now() - timezone.timedelta(minutes=1)
+        self.registro.save()
+        self.assertFalse(self.registro.consumir())
+        self.registro.refresh_from_db()
+        self.assertIsNone(self.registro.usado_em)
+
+    def test_se_a_troca_de_senha_falha_o_token_continua_valendo(self):
+        with mock.patch.object(
+                Usuario, 'save', side_effect=RuntimeError('falha no banco')):
+            with self.assertRaises(RuntimeError):
+                Client().post(self.url, {
+                    'senha_nova': 'SenhaNova@456',
+                    'confirmacao': 'SenhaNova@456'})
+        self.registro.refresh_from_db()
+        self.assertIsNone(self.registro.usado_em)
+
+
+class TesteLimiteDeEmailsPorConta(TestCase):
+    """O nginx limita por endereço. Por conta, quem usa vários endereços
+    ainda poderia encher a caixa de alguém e gastar a cota de envios."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.usuario = Usuario.objects.create_user(
+            username='alvo', password='SenhaAntiga@123',
+            email='alvo@exemplo.com')
+
+    def _pedir(self, ip='10.0.0.1', username='alvo'):
+        return self.client.post(
+            reverse('recuperacao_senha:solicitar'),
+            {'username': username}, REMOTE_ADDR=ip)
+
+    def test_so_os_3_primeiros_pedidos_da_hora_mandam_e_mail(self):
+        for numero in range(6):
+            self._pedir(ip=f'10.0.0.{numero}')
+        self.assertEqual(len(mail.outbox), 3)
+
+    def test_resposta_e_a_mesma_com_ou_sem_limite(self):
+        respostas = []
+        for _ in range(5):
+            resposta = self._pedir()
+            respostas.append(
+                (resposta.status_code, resposta.headers['Location']))
+        self.assertEqual(len(set(respostas)), 1)
+
+    def test_resposta_para_usuario_inexistente_e_igual_a_de_conta_limitada(self):
+        for _ in range(4):
+            limitada = self._pedir()
+        inexistente = self._pedir(username='ninguem')
+        self.assertEqual(limitada.status_code, inexistente.status_code)
+        self.assertEqual(
+            limitada.headers['Location'], inexistente.headers['Location'])
+
+    def test_limite_de_uma_conta_nao_afeta_outra(self):
+        Usuario.objects.create_user(
+            username='outra', password='SenhaAntiga@123', email='o@exemplo.com')
+        for _ in range(5):
+            self._pedir()
+        antes = len(mail.outbox)
+        self._pedir(username='outra')
+        self.assertEqual(len(mail.outbox), antes + 1)
+
+    def test_pedidos_recusados_nao_renovam_a_janela(self):
+        for _ in range(5):
+            self._pedir()
+        with mock.patch('time.time', return_value=time.time() + 61 * 60):
+            self._pedir()
+        self.assertEqual(len(mail.outbox), 4)
+
+    def test_limite_vai_pro_log(self):
+        for _ in range(3):
+            self._pedir()
+        with self.assertLogs('seguranca.recuperacao_senha', level='WARNING') as logs:
+            self._pedir()
+        self.assertIn('limite de e-mails', ' '.join(logs.output))
+
+    def test_convite_da_gestao_nao_conta_no_limite(self):
+        pedido = RequestFactory().get('/')
+        for _ in range(5):
+            enviar_email_recuperacao(pedido, self.usuario, nova_conta=True)
+        self.assertEqual(len(mail.outbox), 5)

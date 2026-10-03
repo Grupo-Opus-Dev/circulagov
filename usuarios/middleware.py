@@ -37,3 +37,36 @@ class TimeoutAbsolutoMiddleware:
                 return redirect(settings.LOGIN_URL)
 
         return self.get_response(request)
+
+
+# Tudo vem do proprio site, exceto a fonte Inter, que o Google Fonts serve
+# (folha de estilo em fonts.googleapis.com e arquivos em fonts.gstatic.com).
+# Sem 'unsafe-inline' em script-src e style-src: se alguem injetar um
+# <script> ou um onclick no HTML, o navegador se recusa a executar.
+POLITICA_DE_CONTEUDO = '; '.join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' https://fonts.googleapis.com",
+    "font-src https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+
+
+class PoliticaDeConteudoMiddleware:
+    """Envia o cabecalho Content-Security-Policy em toda resposta.
+
+    Ele e a segunda camada contra XSS: o escape automatico dos templates
+    impede a injecao, e a politica limita o estrago se alguma passar."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        resposta = self.get_response(request)
+        resposta.headers.setdefault(
+            'Content-Security-Policy', POLITICA_DE_CONTEUDO)
+        return resposta

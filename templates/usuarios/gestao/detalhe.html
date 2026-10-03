@@ -74,7 +74,7 @@
 
   {% if usuario_exibido.dispositivo_totp %}
     <form method="post" action="{% url 'usuarios:gestao_remover_2fa' usuario_exibido.id %}" class="-mt-4 mb-6"
-          onsubmit="return confirm('Remover o 2FA de {{ usuario_exibido.get_username|escapejs }}? A pessoa volta a entrar só com a senha até cadastrar um aparelho novo.');">
+          data-confirmar="Remover o 2FA de {{ usuario_exibido.get_username }}? A pessoa volta a entrar só com a senha até cadastrar um aparelho novo.">
       {% csrf_token %}
       <button type="submit" class="text-xs text-red-700 hover:underline">
         Remover o 2FA desta conta

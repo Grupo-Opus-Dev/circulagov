@@ -43,7 +43,7 @@ Por que não microsserviços:
 ```mermaid
 flowchart TB
     subgraph CLIENTE["Cliente"]
-        nav["Navegador<br/>HTML + Tailwind CSS via CDN"]
+        nav["Navegador<br/>HTML + Tailwind CSS (arquivo estático)"]
     end
 
     subgraph TRANSPORTE["Transporte"]
@@ -252,7 +252,7 @@ mais o texto da linha atual. Detalhes em [INTEGRIDADE_LOGS.md](INTEGRIDADE_LOGS.
 | Criptografia | cryptography | 50.0.1 |
 | TOTP | PyOTP | 2.10.0 |
 | Configuração | django-environ | 0.14.0 |
-| Interface | Django Templates + Tailwind CSS via CDN | não se aplica |
+| Interface | Django Templates + Tailwind CSS v3.4.17, gerado e versionado em `static/css/tailwind.css` | não se aplica |
 
 As versões vêm de `requirements.txt`. Django 5.2 foi escolhido por ser LTS, com
 suporte estendido, o que evita trocar de versão no meio do projeto.
