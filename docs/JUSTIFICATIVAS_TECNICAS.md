@@ -44,7 +44,8 @@ dos sistemas com 2FA hoje.
 (ver `dois_fatores/views.py` e `FLUXO_AUTENTICACAO.md`). Isso garante
 que a senha sozinha nunca é suficiente para autenticar quem tem 2FA
 ativado. Mesmo que um invasor descubra a senha de alguém, ainda
-precisa do código do app autenticador.
+precisa do código do app autenticador. Isso vale para todo caminho de
+entrada porque o login do admin também passa por aqui (seção 12).
 
 **Por que o 2FA é opcional:** para o MVP, exigir 2FA de todo mundo
 adicionaria fricção desnecessária no cadastro inicial. A abordagem
@@ -158,12 +159,29 @@ precisaria de milhares de tentativas para ter chance de acertar uma
 senha com Argon2, se torna impraticável com esse limite combinado ao
 atraso progressivo.
 
-**Por que o bloqueio é por username e não por IP:** bloquear por IP
-sozinho permitiria que um invasor usasse vários IPs diferentes (bem
-comum em ataques reais) para contornar o limite. Bloquear por
-username garante que aquela conta específica fica protegida
-independentemente de onde vêm as tentativas, é a mesma lógica usada
-por grande parte dos sistemas de login com proteção anti-força-bruta.
+**Por que o bloqueio é por usuário e endereço, com um teto por conta:**
+bloquear só por endereço deixaria um invasor trocar de endereço (comum em
+ataques reais) para contornar o limite. Bloquear só por usuário deixaria
+qualquer pessoa trancar a conta de outra apenas errando a senha dela. Por
+isso há dois contadores:
+
+- por par (usuário, endereço): 5 falhas em 15 minutos bloqueiam aquele
+  endereço para aquele usuário, sem afetar quem acessa de outro lugar;
+- por conta, somando todos os endereços: 25 falhas em 15 minutos bloqueiam
+  a conta para todos. O teto é alto para que o dono da conta não seja
+  trancado por um ou dois atacantes, e baixo o bastante para que tentar
+  senhas de muitos endereços deixe de compensar.
+
+O endereço vem do cabeçalho `X-Real-IP`, que o nginx sobrescreve com o
+endereço real da conexão (`CABECALHO_IP_DO_CLIENTE` em `config/settings.py`).
+O cabeçalho não pode vir do cliente, porque o nginx o substitui sempre.
+
+**Por que o bloqueio não é renovado enquanto dura:** a contagem começa na
+primeira falha e, ao chegar no limite, recomeça por 15 minutos cheios.
+Tentativas feitas durante o bloqueio não somam. Antes, cada uma delas
+reiniciava o prazo, e quem continuava tentando, inclusive o próprio dono da
+conta, ficava bloqueado indefinidamente. Os testes estão em
+`TesteBloqueioDeLoginPorEndereco`, em `usuarios/tests.py`.
 
 ## 6. Model de usuário customizado
 
@@ -314,6 +332,35 @@ uma única finalidade. Se uma vazar, a outra proteção continua valendo.
 **Por que a tela de verificação é só para administradores:** o
 resultado mostra em qual linha o log foi alterado, informação que
 ajudaria um invasor a testar se conseguiu esconder rastros.
+
+## 12. O admin do Django usa o login da aplicação
+
+**Onde:** `usuarios/admin_site.py`, `usuarios/admin_config.py` e `INSTALLED_APPS`
+em `config/settings.py`
+
+O admin do Django traz um login próprio, com formulário e rota próprios
+(`/admin/login/`). Esse login não passa pelo segundo fator nem pelo bloqueio por
+tentativas, que existem só no login da aplicação. Resultado, comprovado por
+teste: quem tinha a senha de uma conta de gestão entrava no `/admin/` sem o
+código, mesmo com o 2FA ativo, e podia tentar senhas sem limite. O limite do
+nginx também não cobria esse caminho.
+
+O que a documentação afirmava, que a senha sozinha nunca basta para quem tem
+2FA, valia só para o login da aplicação.
+
+**A correção** troca o site de administração por um que não autentica ninguém. O
+`/admin/login/` passou a só redirecionar para o login da aplicação, e o admin
+aceita a sessão que sai de lá. Assim ele herda o segundo fator e o bloqueio por
+tentativas, sem duplicar código. A troca usa o mecanismo documentado do Django
+para substituir o site padrão, e não altera tabelas.
+
+**Por que não só desligar o `/admin/`:** ele continua útil para consultar e
+corrigir dados que a área de gestão não cobre. Desligar tiraria essa
+ferramenta sem necessidade, agora que o contorno acabou.
+
+**O que continua valendo.** O 2FA segue opcional: uma conta de gestão que nunca o
+ativou entra no admin só com a senha, como entra na aplicação. Exigir o segundo
+fator de toda conta de gestão seria uma decisão de política, e não foi tomada.
 
 ## 13. Trava de tentativas e prazo no segundo fator
 

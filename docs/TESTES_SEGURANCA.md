@@ -166,6 +166,40 @@ Os testes de escape e de marcação da cadeia foram conferidos quebrando o códi
 de propósito: com o escape desligado e com a marcação sempre verdadeira, ambos
 falham.
 
+## 11. Admin do Django usa o login da aplicação
+
+**Ameaça:** entrar no `/admin/` só com a senha, sem o segundo fator, e tentar
+senhas sem o bloqueio por tentativas (ameaça 13 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_post_no_login_do_admin_nao_autentica_ninguem` | `usuarios/tests.py` (`TesteAdminUsaOLoginDaAplicacao`) | Enviar usuário e senha ao `/admin/login/` não abre sessão |
+| `test_senha_certa_no_login_da_aplicacao_ainda_nao_abre_o_admin` | idem | Com 2FA ativo, a senha certa não basta para chegar ao admin |
+| `test_depois_do_segundo_fator_o_admin_abre` | idem | Concluído o segundo fator, o admin abre normalmente |
+| `test_gestor_sem_2fa_entra_pelo_login_da_aplicacao` | idem | Quem não ativou o 2FA entra pelo login da aplicação |
+| `test_admin_sem_login_leva_ao_login_da_aplicacao` | idem | Sem sessão, o admin redireciona para o login da aplicação |
+| `test_usuario_comum_logado_recebe_403` | idem | Usuário sem perfil de gestão recebe 403 |
+| `test_next_apontando_pra_site_externo_e_ignorado` | idem | O parâmetro `next` não vira redirecionamento aberto |
+| `test_login_do_admin_nao_conta_nem_registra_tentativa` | idem | O `/admin/login/` não participa do contador de tentativas |
+
+Contra a configuração antiga do admin, quatro desses testes falham, o que mostra
+que eles detectam o problema.
+
+## 12. Bloqueio de login por endereço e sem renovação
+
+**Ameaça:** bloqueio que nunca termina e conta trancada por quem não tem a senha (ameaça 14 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_bloqueio_nao_e_renovado_por_quem_insiste` | `usuarios/tests.py` (`TesteBloqueioDeLoginPorEndereco`) | Com 30 tentativas durante o bloqueio, ele ainda acaba 16 minutos depois do início |
+| `test_senha_certa_depois_do_prazo_entra_mesmo_apos_insistir` | idem | Passado o prazo, a senha certa entra |
+| `test_durante_o_bloqueio_a_senha_certa_nao_entra` | idem | Durante o bloqueio, nem a senha certa abre sessão |
+| `test_contador_do_par_nao_passa_do_limite_durante_o_bloqueio` | idem | Tentativas bloqueadas não somam no contador |
+| `test_outro_endereco_nao_e_bloqueado_pelos_erros_de_um_so` | idem | Erros de um endereço não trancam os outros |
+| `test_teto_por_conta_barra_quem_troca_de_endereco` | idem | 25 falhas espalhadas em 5 endereços bloqueiam a conta |
+| `test_acerto_zera_so_o_contador_do_par` | idem | O teto da conta não é apagado por um login certo |
+| `test_usa_o_cabecalho_configurado_atras_do_proxy` | idem | Em produção o endereço vem do `X-Real-IP` do nginx |
+
 ## 13. Trava de tentativas e prazo no segundo fator
 
 **Ameaça:** tentar muitos códigos de 6 dígitos depois de acertar a senha, e deixar a etapa do código aberta (ameaça 10 de `ANALISE_RISCOS.md`).
