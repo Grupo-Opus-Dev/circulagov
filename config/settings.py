@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'usuarios.middleware.TimeoutAbsolutoMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'usuarios.middleware.PoliticaDeConteudoMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -251,6 +252,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# CSS e JavaScript proprios do projeto. O CSS do Tailwind e gerado uma vez e
+# versionado aqui, em vez de ser montado no navegador por script de terceiro.
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Pasta onde o collectstatic junta tudo pro WhiteNoise servir.
 STATIC_ROOT = BASE_DIR / 'staticfiles'

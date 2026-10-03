@@ -166,6 +166,22 @@ Os testes de escape e de marcação da cadeia foram conferidos quebrando o códi
 de propósito: com o escape desligado e com a marcação sempre verdadeira, ambos
 falham.
 
+## 15. CSS próprio e política de conteúdo
+
+**Ameaça:** código de terceiro ou injetado executando dentro das páginas (ameaça 16 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_toda_resposta_tem_o_cabecalho` | `usuarios/test_csp.py` (`TestePoliticaDeConteudo`) | O cabeçalho `Content-Security-Policy` vem com `script-src 'self'`, `object-src 'none'` e `frame-ancestors 'none'` |
+| `test_politica_nao_libera_codigo_inline_nem_cdn` | idem | A política não tem `unsafe-inline`, `unsafe-eval` nem o CDN do Tailwind |
+| `test_cabecalho_vem_tambem_em_erro_e_redirecionamento` | idem | Respostas 404 e redirecionamentos também levam o cabeçalho |
+| `test_nenhuma_tela_depende_de_codigo_dentro_do_html` | idem | Dezesseis telas, da aplicação e do admin, não têm script, `<style>`, `onclick`, `style=` nem `javascript:` dentro do HTML |
+| `test_nenhum_template_carrega_script_de_terceiro` | idem | Nenhum template usa `<script src>` externo |
+| `test_toda_classe_usada_nos_templates_existe_no_css` | `usuarios/test_csp.py` (`TesteCssDoTailwindVersionado`) | Cada classe usada nos templates e nas strings `CLASSE_*` tem regra em `static/css/tailwind.css` |
+| `test_o_css_nao_depende_do_cdn` | idem | O arquivo de CSS não referencia o CDN |
+
+Conferência manual feita em 03/10/2026: a tela de login abre com o CSS estático, sem o objeto `tailwind` no navegador e sem erros de CSP no console.
+
 ## Execução contínua
 
 Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,

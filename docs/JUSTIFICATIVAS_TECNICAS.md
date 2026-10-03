@@ -314,3 +314,50 @@ uma única finalidade. Se uma vazar, a outra proteção continua valendo.
 **Por que a tela de verificação é só para administradores:** o
 resultado mostra em qual linha o log foi alterado, informação que
 ajudaria um invasor a testar se conseguiu esconder rastros.
+
+## 15. CSS sem CDN e política de conteúdo (CSP)
+
+**Onde:** `static/`, `templates/base.html`, `usuarios/middleware.py`
+(`PoliticaDeConteudoMiddleware`) e `usuarios/test_csp.py`
+
+**Por que sair do CDN do Tailwind:** o script do CDN monta o CSS no navegador
+e precisa de `unsafe-eval` e de estilo inline para funcionar, o que anula a
+principal proteção de uma CSP. Além disso, ele roda com todos os poderes de
+uma página de login e de 2FA, vindo de um domínio que o projeto não controla,
+sem verificação de integridade. O próprio Tailwind desaconselha o uso em
+produção. O CSS gerado tem cerca de 15 KB, bem menos que o script.
+
+**Como o CSS foi gerado:** com as classes realmente usadas nos templates e nas
+strings `CLASSE_*` do Python, passando por esse mesmo CDN uma única vez, na
+versão 3.4.17, e copiando o resultado para `static/css/tailwind.css`. Ele é
+versionado no repositório, então o que roda em produção é o que foi revisado.
+
+**Por que um teste de cobertura de classes:** sem o CDN, uma classe nova num
+template fica sem estilo e ninguém percebe. `TesteCssDoTailwindVersionado`
+lê as classes dos templates e confere se cada uma tem regra no arquivo. Se
+falhar, o CSS precisa ser gerado de novo.
+
+**A política:** `default-src 'self'`, `script-src 'self'`,
+`style-src 'self' https://fonts.googleapis.com`,
+`font-src https://fonts.gstatic.com`, `img-src 'self' data:`,
+`object-src 'none'`, `base-uri 'self'`, `form-action 'self'` e
+`frame-ancestors 'none'`. Não há `unsafe-inline` nem `unsafe-eval`.
+
+**Por que mexer nos templates:** a política proíbe script dentro do HTML.
+O script da tela de novo usuário foi para `static/js/novo-usuario.js`, e o
+`onsubmit` da confirmação de remoção do 2FA virou o atributo
+`data-confirmar`, tratado por `static/js/confirmar.js`. O bloco `<style>` da
+fonte foi para `static/css/circulagov.css`.
+
+**Por que o Google Fonts ficou:** a fonte Inter já era carregada de lá.
+Trazê-la para o servidor exige baixar e versionar os arquivos da fonte, o que
+fica como melhoria. A política só libera estilo e fonte desse domínio, nunca
+script.
+
+**Por que `frame-ancestors 'none'`:** equivale ao `X-Frame-Options: DENY` que
+o Django já envia, para os navegadores que seguem só a CSP.
+
+**O admin do Django:** as telas dele usam apenas arquivos próprios em `static/`
+e não precisaram de exceção. O teste `test_nenhuma_tela_depende_de_codigo_dentro_do_html`
+percorre a aplicação e o admin procurando script, estilo e manipuladores de evento
+escritos dentro do HTML.

@@ -132,6 +132,14 @@ As ameaças foram levantadas com base nos ativos identificados na seção 6.6 e 
 
 **Impacto:** Indisponibilidade da recuperação de senha e incômodo ao titular da conta.
 
+### 16. Script de terceiro sem controle e ausência de política de conteúdo
+
+**Descrição:** O CSS do Tailwind era montado no navegador por um script carregado de `cdn.tailwindcss.com`, sem integridade verificada e sem política de conteúdo (CSP) no site. Se esse domínio fosse comprometido, o código dele rodaria dentro das páginas de login, 2FA e gestão. Sem CSP, qualquer HTML injetado por uma falha de escape também executaria sem restrição.
+
+**Ativo afetado:** Sessões, credenciais digitadas e dados exibidos nas telas.
+
+**Impacto:** Roubo de senha e de código 2FA digitados, e ações feitas em nome da pessoa logada.
+
 ### Lacunas identificadas
 
 Além das ameaças já consideradas pelo projeto, outras ameaças podem ser identificadas durante a análise. Quando uma ameaça ainda não possui uma proteção implementada, ela deve ser registrada como uma lacuna de segurança para avaliação posterior.
@@ -313,3 +321,17 @@ A análise abaixo relaciona cada ameaça da seção 6.7 com sua probabilidade, i
 **Onde está no código:** `deploy/nginx/circulagov-limites.conf`.
 
 **Risco residual:** Médio. O limite é por endereço e permite mais de 4 mil pedidos por dia de um só, mais que a cota diária de envios da conta de e-mail. Contém o abuso, mas não o impede.
+
+### 16. Script de terceiro sem controle e ausência de política de conteúdo
+
+**Probabilidade:** Baixa
+
+**Impacto:** Alta
+
+**Risco resultante:** Médio
+
+**Contramedida implementada:** O CSS do Tailwind passou a ser um arquivo do próprio projeto (`static/css/tailwind.css`), e o site não carrega mais nenhum script externo. O cabeçalho `Content-Security-Policy` vai em toda resposta e só aceita script e estilo do próprio site (sem `unsafe-inline`), mais a folha de estilo e os arquivos da fonte Inter, que o Google Fonts serve. Os scripts que estavam escritos dentro do HTML foram para arquivos em `static/js/`.
+
+**Onde está no código:** `usuarios/middleware.py` (`PoliticaDeConteudoMiddleware`), `templates/base.html`, `static/` e `config/settings.py`. Os testes estão em `usuarios/test_csp.py`.
+
+**Risco residual:** Baixo-médio. O Google Fonts continua sendo um terceiro com permissão para estilo e fonte. Ele não pode executar script, mas a folha de estilo dele poderia, em tese, alterar a aparência das telas. Trazer a fonte para o próprio servidor eliminaria isso.
