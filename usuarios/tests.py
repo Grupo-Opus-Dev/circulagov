@@ -1,14 +1,20 @@
+import os
+import subprocess
+import sys
 import time
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 from django.core import mail
-from django.test import Client, TestCase
+from django.core.cache import cache
+from django.core.management import call_command
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from alunos.models import Aluno
 from dois_fatores.models import DispositivoTOTP
+from usuarios import seguranca
 from usuarios.signals import CHAVE_INICIO_SESSAO
 
 Usuario = get_user_model()
@@ -648,3 +654,73 @@ class TesteCadastroComLinkDeSenha(TestCase):
         self.assertEqual(len(mail.outbox), 0)
         criado = Usuario.objects.get(username='convidado')
         self.assertTrue(criado.check_password('SenhaForte!2026'))
+
+
+def _cache_em_banco(**opcoes):
+    return {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'cache_teste_bloqueio',
+            'OPTIONS': opcoes,
+        }
+    }
+
+
+class TesteDescarteDoCacheDeBloqueio(TestCase):
+    """O contador de força bruta fica no cache em banco, em produção. O
+    cache em banco do Django tem limite de entradas e, ao passar dele,
+    apaga um terço delas POR ORDEM ALFABÉTICA DA CHAVE, e não as mais
+    antigas. Sem limite folgado, quem tenta senhas contra uma conta
+    zera o próprio bloqueio mandando tentativas com nomes inventados."""
+
+    def _preparar(self, **opcoes):
+        override = override_settings(CACHES=_cache_em_banco(**opcoes))
+        override.enable()
+        self.addCleanup(override.disable)
+        call_command('createcachetable', 'cache_teste_bloqueio', verbosity=0)
+
+    def _spray(self, quantidade):
+        # Nomes que ordenam depois da vítima, só pra tornar o teste
+        # determinístico: o descarte apaga as chaves do começo da ordem.
+        for i in range(quantidade):
+            seguranca.registrar_falha(f'zzz_inventado_{i:04d}')
+
+    def test_limite_pequeno_deixa_o_atacante_zerar_o_bloqueio(self):
+        """Demonstra o mecanismo, com limite baixo pra não precisar de
+        milhares de linhas. É o que explica o teste seguinte."""
+        self._preparar(MAX_ENTRIES=50)
+        for _ in range(4):
+            seguranca.registrar_falha('aaa_vitima')
+        self.assertEqual(
+            cache.get(seguranca.chave_cache('aaa_vitima')), 4)
+
+        self._spray(60)
+
+        self.assertIsNone(cache.get(seguranca.chave_cache('aaa_vitima')))
+
+    def test_limite_folgado_preserva_o_contador(self):
+        self._preparar(MAX_ENTRIES=100_000)
+        for _ in range(4):
+            seguranca.registrar_falha('aaa_vitima')
+
+        self._spray(400)
+
+        self.assertEqual(
+            cache.get(seguranca.chave_cache('aaa_vitima')), 4)
+
+    def test_configuracao_de_producao_tem_limite_folgado(self):
+        """Lê o settings de produção (DEBUG=False) num processo à parte,
+        porque os testes rodam com DEBUG=True e lá o cache nem é o de
+        banco. Pega a remoção acidental da opção."""
+        codigo = (
+            "import os, django;"
+            "os.environ['DJANGO_SETTINGS_MODULE']='config.settings';"
+            "from django.conf import settings;"
+            "print(settings.CACHES['default']['OPTIONS']['MAX_ENTRIES'])"
+        )
+        ambiente = dict(os.environ, DEBUG='False')
+        resultado = subprocess.run(
+            [sys.executable, '-c', codigo], cwd=settings.BASE_DIR,
+            env=ambiente, capture_output=True, text=True, timeout=60)
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+        self.assertGreaterEqual(int(resultado.stdout.strip()), 50_000)

@@ -134,7 +134,6 @@ Listado de propósito, para o documento não prometer o que o sistema não faz.
 - transferência de acervo entre unidades
 - licitações e controle de estoque
 - cadastro de escolas e de bibliotecários como entidades próprias
-- envio real de e-mail, que hoje sai no terminal em vez de ir para o destinatário
 
 O `docs/README.md`, escrito no começo do projeto, descreve o produto completo
 que foi imaginado. Este documento descreve o que existe.
@@ -203,9 +202,11 @@ python manage.py verificar_logs
 
 ## 10. Limitações conhecidas
 
-- o contador de força bruta usa o cache local em memória, então em mais de um
-  processo cada um teria a própria contagem
-- o e-mail de recuperação escreve no terminal em vez de enviar de verdade
+- o contador de força bruta fica numa tabela de cache no banco, limitada a 100
+  mil entradas. Passando disso, parte dos contadores é descartada, o que
+  permitiria zerar o bloqueio de uma conta com dezenas de milhares de
+  tentativas com nomes inventados
+- o e-mail de recuperação sai por uma conta Gmail, com limite diário de envios
 - o log é arquivo local: a cadeia de HMAC detecta alteração, mas quem tiver
   acesso de escrita ao servidor ainda pode apagar o arquivo inteiro
 - não há rotina de expurgo por tempo de retenção
