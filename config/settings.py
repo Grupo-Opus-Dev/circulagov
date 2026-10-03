@@ -31,7 +31,10 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    # No lugar de 'django.contrib.admin': o login do admin padrao nao passa
+    # pelo segundo fator nem pelo bloqueio de tentativas. Ver
+    # usuarios/admin_site.py.
+    'usuarios.admin_config.AdminCirculaGovConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
