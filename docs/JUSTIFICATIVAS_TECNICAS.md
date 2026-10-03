@@ -314,3 +314,28 @@ uma única finalidade. Se uma vazar, a outra proteção continua valendo.
 **Por que a tela de verificação é só para administradores:** o
 resultado mostra em qual linha o log foi alterado, informação que
 ajudaria um invasor a testar se conseguiu esconder rastros.
+
+## 14. Recuperação de senha: uso único atômico e limite de e-mails por conta
+
+**Onde:** `recuperacao_senha/models.py` e `recuperacao_senha/views.py`
+
+**Uso único.** A versão anterior conferia o token, trocava a senha e só então
+o marcava como usado, sem transação. Dois pedidos simultâneos com o mesmo link
+passavam os dois pela conferência. Agora o token é consumido por um
+`UPDATE ... WHERE usado_em IS NULL AND expira_em >= agora`, e o banco decide
+quem ganhou: só quem alterou uma linha segue. O consumo e a troca da senha
+ficam na mesma transação, então uma falha ao gravar a senha devolve o token.
+A senha é salva só no campo `password` (`update_fields`), pra não regravar o
+restante do usuário com dados que podem ter mudado.
+
+**Por que não só um `select_for_update`:** funcionaria, mas o UPDATE condicional
+é um passo só, não depende de lembrar de travar a linha antes de ler e deixa
+a decisão no banco.
+
+**Limite de e-mails.** O nginx limita por endereço. Quem usa muitos endereços
+ainda poderia encher a caixa de uma pessoa e gastar a cota diária de envios da
+conta. O limite por conta é de 3 e-mails por hora, contados no cache com
+janela fixa. Os pedidos além disso recebem a mesma resposta genérica de
+sempre, para não revelar que a conta existe, e vão para o log. O convite da
+gestão não entra nessa conta, porque é uma ação de um gestor autenticado, e
+não um pedido anônimo.

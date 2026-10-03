@@ -166,6 +166,24 @@ Os testes de escape e de marcação da cadeia foram conferidos quebrando o códi
 de propósito: com o escape desligado e com a marcação sempre verdadeira, ambos
 falham.
 
+## 14. Recuperação de senha: uso simultâneo e limite por conta
+
+**Ameaça:** usar o mesmo link duas vezes ao mesmo tempo, e encher a caixa de e-mail de uma conta (ameaças 15 e 12 de `ANALISE_RISCOS.md`).
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_consumir_so_deixa_um_dos_pedidos_simultaneos_passar` | `recuperacao_senha/tests.py` (`TesteUsoSimultaneoDoToken`) | Com duas threads, só uma consome o token |
+| `test_dois_pedidos_pelo_mesmo_link_so_um_troca_a_senha` | idem | Dois pedidos HTTP simultâneos: um recebe 302, o outro 400, e só uma das senhas fica valendo. Falha com o código antigo |
+| `test_token_expirado_nao_e_consumido` | idem | Token vencido não é consumido |
+| `test_se_a_troca_de_senha_falha_o_token_continua_valendo` | idem | A transação devolve o token se a gravação falha |
+| `test_so_os_3_primeiros_pedidos_da_hora_mandam_e_mail` | `recuperacao_senha/tests.py` (`TesteLimiteDeEmailsPorConta`) | Seis pedidos de endereços diferentes geram só 3 e-mails |
+| `test_resposta_e_a_mesma_com_ou_sem_limite` | idem | O limite não muda a resposta |
+| `test_resposta_para_usuario_inexistente_e_igual_a_de_conta_limitada` | idem | Não dá para descobrir contas pelo limite |
+| `test_limite_de_uma_conta_nao_afeta_outra` | idem | O contador é por conta |
+| `test_pedidos_recusados_nao_renovam_a_janela` | idem | Depois de uma hora, volta a enviar |
+| `test_limite_vai_pro_log` | idem | O limite gera linha no log |
+| `test_convite_da_gestao_nao_conta_no_limite` | idem | O convite criado pela gestão não consome o limite |
+
 ## Execução contínua
 
 Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,
