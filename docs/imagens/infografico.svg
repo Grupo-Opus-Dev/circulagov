@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-labelledby="t d">
+  <title id="t">CirculaGov: identidade e proteção de dados em camadas</title>
+  <desc id="d">Três mecanismos de entrada (identidade, segundo fator e recuperação de senha) passam pela infraestrutura protegida e alimentam três resultados (auditoria, LGPD e gestão de usuários)</desc>
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef6fb"/>
+      <stop offset="1" stop-color="#f4f1fa"/>
+    </linearGradient>
+  </defs>
+  <style>
+    text { font-family: Inter, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    .tit { font-size: 20px; font-weight: 700; fill: #0f172a; }
+    .sec { font-size: 18px; font-weight: 700; }
+    .li  { font-size: 14px; fill: #334155; }
+    .cab { font-size: 15px; font-weight: 700; fill: #475569; letter-spacing: 0.5px; }
+    .peq { font-size: 13px; fill: #334155; }
+  </style>
+
+  <rect width="1280" height="720" rx="18" fill="url(#fundo)"/>
+  <text x="640" y="48" text-anchor="middle" class="tit" font-size="28" style="font-size:28px">CirculaGov: identidade e proteção de dados em camadas</text>
+  <text x="270" y="102" text-anchor="middle" class="cab">COMO A PESSOA ENTRA</text>
+  <text x="640" y="102" text-anchor="middle" class="cab">ONDE RODA</text>
+  <text x="1010" y="102" text-anchor="middle" class="cab">O QUE FICA REGISTRADO E PROTEGIDO</text>
+
+  <!-- ligacoes esquerda -> centro -->
+  <path d="M440 215 C500 215 470 300 520 300" fill="none" stroke="#f4a261" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <path d="M440 390 C490 390 490 390 520 390" fill="none" stroke="#2a9d8f" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <path d="M440 565 C500 565 470 480 520 480" fill="none" stroke="#8e6bb8" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <!-- ligacoes centro -> direita -->
+  <path d="M760 300 C810 300 780 215 840 215" fill="none" stroke="#f4a261" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <path d="M760 390 C790 390 790 390 840 390" fill="none" stroke="#2a9d8f" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+  <path d="M760 480 C810 480 780 565 840 565" fill="none" stroke="#8e6bb8" stroke-width="10" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- esquerda -->
+  <g>
+    <rect x="60" y="130" width="380" height="170" rx="26" fill="#fdebd9" stroke="#f4a261" stroke-width="3"/>
+    <text x="84" y="166" class="sec" fill="#b45309">1. Identidade</text>
+    <text x="84" y="198" class="li">Senha com Argon2id e política de senha</text>
+    <text x="84" y="224" class="li">Bloqueio por usuário e por endereço</text>
+    <text x="84" y="250" class="li">Sessão: 30 min parada, 12 h no máximo</text>
+    <text x="84" y="276" class="li">Cadastro por convite, sem senha em e-mail</text>
+  </g>
+  <g>
+    <rect x="60" y="305" width="380" height="170" rx="26" fill="#d9f0ed" stroke="#2a9d8f" stroke-width="3"/>
+    <text x="84" y="341" class="sec" fill="#0f766e">2. Segundo fator</text>
+    <text x="84" y="373" class="li">TOTP com QR code, segredo em AES-GCM</text>
+    <text x="84" y="399" class="li">5 códigos errados bloqueiam a conta 15 min</text>
+    <text x="84" y="425" class="li">A etapa do código expira em 5 min</text>
+    <text x="84" y="451" class="li">Admin do Django passa pelo mesmo login</text>
+  </g>
+  <g>
+    <rect x="60" y="480" width="380" height="170" rx="26" fill="#e8e0f3" stroke="#8e6bb8" stroke-width="3"/>
+    <text x="84" y="516" class="sec" fill="#6b3fa0">3. Recuperação de senha</text>
+    <text x="84" y="548" class="li">Token guardado só como hash, 30 min</text>
+    <text x="84" y="574" class="li">Uso único e atômico, mesmo em paralelo</text>
+    <text x="84" y="600" class="li">Até 3 e-mails por conta por hora</text>
+    <text x="84" y="626" class="li">Resposta igual exista ou não a conta</text>
+  </g>
+
+  <!-- centro -->
+  <g>
+    <rect x="520" y="130" width="240" height="520" rx="30" fill="#ffffff" stroke="#94a3b8" stroke-width="3"/>
+    <text x="640" y="170" text-anchor="middle" class="sec" fill="#1e3a8a">CirculaGov</text>
+    <text x="640" y="192" text-anchor="middle" class="peq">Docker em VPS Ubuntu 24.04</text>
+
+    <rect x="542" y="214" width="196" height="92" rx="16" fill="#eff6ff" stroke="#1e3a8a" stroke-width="2"/>
+    <text x="640" y="240" text-anchor="middle" class="li" font-weight="700">nginx</text>
+    <text x="640" y="262" text-anchor="middle" class="peq">TLS 1.3 e HSTS</text>
+    <text x="640" y="282" text-anchor="middle" class="peq">limite por endereço</text>
+
+    <rect x="542" y="322" width="196" height="116" rx="16" fill="#eff6ff" stroke="#1e3a8a" stroke-width="2"/>
+    <text x="640" y="348" text-anchor="middle" class="li" font-weight="700">Django 5.2 + Gunicorn</text>
+    <text x="640" y="372" text-anchor="middle" class="peq">CSP sem script de terceiros</text>
+    <text x="640" y="392" text-anchor="middle" class="peq">CSRF e cookies seguros</text>
+    <text x="640" y="412" text-anchor="middle" class="peq">controle de acesso por perfil</text>
+
+    <rect x="542" y="454" width="196" height="92" rx="16" fill="#eff6ff" stroke="#1e3a8a" stroke-width="2"/>
+    <text x="640" y="480" text-anchor="middle" class="li" font-weight="700">PostgreSQL 17</text>
+    <text x="640" y="502" text-anchor="middle" class="peq">usuários e sessões</text>
+    <text x="640" y="522" text-anchor="middle" class="peq">contadores de tentativas</text>
+
+    <rect x="542" y="562" width="196" height="64" rx="16" fill="#fef2f2" stroke="#b91c1c" stroke-width="2"/>
+    <text x="640" y="588" text-anchor="middle" class="li" font-weight="700">UFW e Fail2Ban</text>
+    <text x="640" y="609" text-anchor="middle" class="peq">acesso ao servidor só por chave</text>
+  </g>
+
+  <!-- direita -->
+  <g>
+    <rect x="840" y="130" width="380" height="170" rx="26" fill="#fdebd9" stroke="#f4a261" stroke-width="3"/>
+    <text x="864" y="166" class="sec" fill="#b45309">Auditoria</text>
+    <text x="864" y="198" class="li">Log com HMAC encadeado, linha a linha</text>
+    <text x="864" y="224" class="li">Âncoras detectam o corte do final</text>
+    <text x="864" y="250" class="li">Tela de eventos com filtros e integridade</text>
+    <text x="864" y="276" class="li">Senha e token nunca vão para o log</text>
+  </g>
+  <g>
+    <rect x="840" y="305" width="380" height="170" rx="26" fill="#d9f0ed" stroke="#2a9d8f" stroke-width="3"/>
+    <text x="864" y="341" class="sec" fill="#0f766e">LGPD</text>
+    <text x="864" y="373" class="li">Consentimento com registro e revogação</text>
+    <text x="864" y="399" class="li">Titular consulta e pede exclusão dos dados</text>
+    <text x="864" y="425" class="li">Dados minimizados: RA e nome do aluno</text>
+    <text x="864" y="451" class="li">Segredo do 2FA cifrado em repouso</text>
+  </g>
+  <g>
+    <rect x="840" y="480" width="380" height="170" rx="26" fill="#e8e0f3" stroke="#8e6bb8" stroke-width="3"/>
+    <text x="864" y="516" class="sec" fill="#6b3fa0">Gestão de usuários</text>
+    <text x="864" y="548" class="li">Lista, perfil, edição e remoção do 2FA</text>
+    <text x="864" y="574" class="li">Link de senha por e-mail ou senha definida</text>
+    <text x="864" y="600" class="li">Só o perfil de gestão acessa (403 aos demais)</text>
+    <text x="864" y="626" class="li">Toda ação de gestão vai para o log</text>
+  </g>
+
+  <text x="640" y="692" text-anchor="middle" class="peq">Cada bloco corresponde a código, testes e documentação do repositório. Veja a seção Estrutura do repositório.</text>
+</svg>
