@@ -280,6 +280,37 @@ Conferência manual feita em 03/10/2026: a tela de login abre com o CSS estátic
 | `test_tela_mostra_o_corte_do_final` | idem | As telas de integridade e de eventos mostram o corte |
 | `test_tela_avisa_quando_nao_ha_ancora` | idem | A tela avisa que, sem âncora, o corte não seria detectado |
 
+## 17. Criptografia em repouso e TLS
+
+**Ameaça:** o banco vazar e expor o segredo do 2FA em texto puro, alguém alterar
+o segredo cifrado sem ser notado, ou o tráfego circular sem cifra.
+
+Criptografia em repouso (itens 3.4 a 3.6):
+
+| Teste | Arquivo | O que prova |
+|---|---|---|
+| `test_cifrar_e_decifrar_devolve_o_valor_original` | `dois_fatores/tests.py` (`TesteCifragemDoSegredo`) | A cifragem AES-GCM é reversível com a chave certa |
+| `test_valor_cifrado_e_diferente_do_original` | idem | O valor guardado não contém o segredo em texto puro |
+| `test_adulterar_o_cifrado_impede_a_decifragem` | idem | O AES-GCM é autenticado: um byte alterado faz a decifragem falhar, em vez de devolver lixo |
+| `test_dispositivo_gera_segredo_cifrado_automaticamente` | idem | O segredo nasce já cifrado, e o valor puro não fica no banco |
+
+TLS e HTTPS (itens 3.1 a 3.3) **não têm teste automatizado de unidade**. As
+proteções são as configurações do bloco `if not DEBUG` de `config/settings.py`
+(redirecionamento para HTTPS, cookies seguros e HSTS), e elas são conferidas de
+dois jeitos:
+
+- **Na CI:** o passo `Checar a configuracao de producao` roda
+  `python manage.py check --deploy --fail-level WARNING` com `DEBUG=False`. Se
+  alguém remover uma dessas proteções sem querer, o passo reprova. Foi
+  conferido removendo o HSTS e o redirecionamento de propósito: o comando
+  acusou o aviso `security.W004` e terminou com erro.
+- **À mão:** a evidência de tráfego cifrado, com `openssl s_client` e `curl`,
+  está em [`EVIDENCIA_TLS.md`](EVIDENCIA_TLS.md).
+
+O `check --deploy` confere que as configurações estão presentes, não que o
+servidor de produção está respondendo com TLS. Esta segunda parte só a evidência
+manual comprova.
+
 ## Execução contínua
 
 Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,
@@ -302,9 +333,13 @@ python manage.py test
 
 ## Resultados da execução
 
-O registro abaixo é de uma execução datada. Desde então a suíte cresceu, e em
-03/10/2026 tem 192 testes. A execução mais recente, com resultado e log, está
-sempre na aba Actions do repositório.
+O registro abaixo é de uma execução datada (24/09/2026, 109 testes). Desde
+então a suíte cresceu. Na última execução na `main` (04/10/2026) ela tem
+**259 testes, todos passando e nenhum pulado**
+([execução na CI](https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/37233792911),
+`Ran 259 tests in 25.256s`, `OK`), e a contagem era a mesma em 16/10/2026. A
+execução mais recente, com resultado e log, está sempre na aba Actions do
+repositório.
 
 Execução real em **24/09/2026**, com **Python 3.13.15** e **Django
 5.2.17**.
