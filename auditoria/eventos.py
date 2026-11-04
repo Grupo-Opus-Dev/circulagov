@@ -5,6 +5,7 @@ integridade: assim pode ser testado sem banco e reaproveitado fora de
 uma requisição.
 """
 
+import os
 import re
 from collections import deque
 from dataclasses import dataclass
@@ -59,7 +60,7 @@ def ler_eventos(caminho, primeira_quebra=None, limite=LIMITE_DE_LINHAS):
     confirmadas pela verificação. Da quebra em diante, nada se pode
     afirmar, nem sobre as linhas que parecem normais.
     """
-    caminho = Path(caminho)
+    caminho = Path(os.path.abspath(caminho))
     if not caminho.exists():
         return [], 0
 

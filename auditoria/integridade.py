@@ -76,7 +76,7 @@ def _ultimo_mac_no_fim(caminho):
     Lê só o final, em blocos que dobram de tamanho, em vez de percorrer o
     log inteiro a cada evento.
     """
-    caminho = Path(caminho)
+    caminho = Path(os.path.abspath(caminho))
     if not caminho.exists():
         return MAC_INICIAL
 
@@ -259,7 +259,7 @@ def verificar_arquivo(caminho, chave_base64, ancoras=()):
 
     Com âncoras, confere também que o final do log não foi cortado."""
     chave = decodificar_chave(chave_base64)
-    caminho = Path(caminho)
+    caminho = Path(os.path.abspath(caminho))
     ancoras = list(ancoras)
 
     if not caminho.exists():
