@@ -1,0 +1,23 @@
+# Vulnerabilidades suprimidas na varredura do Trivy (devsecops-avancado.yml).
+#
+# Formato: um ID por linha. Comentarios comecam com #. Documentacao:
+# https://trivy.dev/docs/configuration/filtering/#by-finding-ids
+#
+# ---- pip._vendor (setuptools, urllib3, msgpack) ----
+#
+# Essas CVE atingem pacotes que o Trivy encontra em
+# /usr/local/lib/python3.13/site-packages/pip/_vendor/, que sao copias
+# embutidas no proprio pip. Nenhuma esta no requirements.txt, nenhuma e
+# importada pela aplicacao, e `pip show` nao as encontra como instaladas.
+# So entram em execucao se alguem rodar `pip install` dentro do container,
+# coisa que o Gunicorn em producao nunca faz.
+#
+# O caminho real de correcao seria atualizar o proprio pip; enquanto
+# isso nao sai como versao oficial, suprimimos as CVE com esta
+# justificativa escrita.
+
+CVE-2025-47273    # setuptools (pip._vendor)
+CVE-2026-97687    # urllib3 (pip._vendor)
+CVE-2026-97689    # urllib3 (pip._vendor)
+CVE-2026-114613   # msgpack (pip._vendor)
+GHSA-6v7p-g79w-8964  # msgpack (pip._vendor)

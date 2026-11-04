@@ -159,14 +159,19 @@ jobs:
         # documentado na secao de SBOM do Trivy. Para ter a lista a gente
         # precisa de um segundo scan, com --scanners vuln. --ignore-unfixed
         # tira CVE sem correcao disponivel, que so o time do Debian pode
-        # arrumar, nao da pra fazer nada do nosso lado. Primeiro gero o
-        # JSON (para ir pro artefato) e depois o scan que quebra o build.
+        # arrumar, nao da pra fazer nada do nosso lado.
+        #
+        # .trivyignore no raiz do repositorio suprime CVE suspeitas de
+        # falso positivo (ver o proprio .trivyignore pra justificativa).
+        # Primeiro gero o JSON (sem o ignore, pra ficar completo no
+        # artefato) e depois o scan que quebra o build (ja com o ignore).
         run: |
           trivy image --scanners vuln --severity HIGH,CRITICAL \
             --ignore-unfixed --format json \
             --output trivy-vulnerabilidades.json circulagov-ci:local
           trivy image --scanners vuln --severity HIGH,CRITICAL \
-            --ignore-unfixed --exit-code 1 circulagov-ci:local
+            --ignore-unfixed --ignorefile .trivyignore \
+            --exit-code 1 circulagov-ci:local
 
       - name: Subir o relatorio de vulnerabilidades como artefato
         if: always()
