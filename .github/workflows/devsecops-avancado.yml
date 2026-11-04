@@ -154,6 +154,14 @@ jobs:
           name: sbom-cyclonedx
           path: sbom.cdx.json
 
+      - name: Confirmar que o pip nao esta na imagem
+        # Guarda contra regressao: se alguem tirar o "pip uninstall" do
+        # Dockerfile, as CVE do pip._vendor voltam e o scan de vulnerabilidade
+        # logo abaixo quebra. Rodando antes dele, a causa aparece explicita.
+        run: |
+          docker run --rm --entrypoint python circulagov-ci:local -c             "import importlib.util, sys; sys.exit('pip ainda esta na imagem' if importlib.util.find_spec('pip') else 0)"
+          echo "pip ausente da imagem"
+
       - name: Procurar vulnerabilidades HIGH/CRITICAL na imagem
         # --format cyclonedx desliga a busca de vulnerabilidade, e isto esta
         # documentado na secao de SBOM do Trivy. Para ter a lista a gente
@@ -161,8 +169,9 @@ jobs:
         # tira CVE sem correcao disponivel, que so o time do Debian pode
         # arrumar, nao da pra fazer nada do nosso lado.
         #
-        # .trivyignore no raiz do repositorio suprime CVE suspeitas de
-        # falso positivo (ver o proprio .trivyignore pra justificativa).
+        # .trivyignore no raiz do repositorio e onde ficaria uma supressao
+        # justificada. Hoje esta vazio: as CVE do pip._vendor foram
+        # corrigidas tirando o pip da imagem (ver Dockerfile).
         # Primeiro gero o JSON completo pro artefato (com --ignorefile ""
         # pra NAO suprimir, senao o arquivo esconde o que foi ignorado e
         # fica inutil como evidencia). Depois o scan que quebra o build,

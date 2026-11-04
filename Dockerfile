@@ -14,8 +14,15 @@ RUN apt-get update \
 
 # Dependencias antes do codigo: enquanto o requirements nao mudar, o
 # Docker reaproveita esta camada e o build fica rapido.
+#
+# O pip sai da imagem logo depois de instalar. Em producao nada o usa (o
+# entrypoint so roda migrate, collectstatic e o gunicorn), e as copias de
+# bibliotecas que ele carrega em pip/_vendor tinham CVE apontadas pelo Trivy.
+# Precisa ser no mesmo RUN: num RUN separado os arquivos continuariam numa
+# camada de baixo e iriam junto na imagem. Se um dia precisar dele dentro do
+# container, `python -m ensurepip` traz de volta.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt     && pip uninstall -y pip
 
 COPY . .
 
