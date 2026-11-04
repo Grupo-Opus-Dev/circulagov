@@ -307,6 +307,13 @@ class TesteListaDeUsuarios(TestCase):
             reverse('usuarios:gestao_lista'), {'busca': 'RA-9988'})
         self.assertContains(resposta, 'carla')
 
+    def test_busca_com_byte_nulo_nao_derruba_a_tela(self):
+        """O PostgreSQL recusa o caractere nulo em texto. A busca vai direto
+        para o banco, então sem tratamento isso virava erro 500."""
+        resposta = self.client.get(
+            reverse('usuarios:gestao_lista'), {'busca': 'ana\x00'})
+        self.assertEqual(resposta.status_code, 200)
+
     def test_lista_nao_expoe_hash_de_senha(self):
         """Mesmo sendo tela de gestão, o hash não tem por que aparecer."""
         resposta = self.client.get(reverse('usuarios:gestao_lista'))

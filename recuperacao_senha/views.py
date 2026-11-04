@@ -10,7 +10,7 @@ from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from usuarios import contadores
+from usuarios import contadores, entrada
 
 from .models import MINUTOS_VALIDADE_TOKEN, TokenRecuperacaoSenha
 
@@ -45,7 +45,8 @@ def solicitar(request):
     nomes de usuário no formulário (enumeração de contas).
     """
     if request.method == 'POST':
-        nome_usuario = request.POST.get('username', '').strip()
+        # texto() tira byte nulo e espaços; o banco recusaria NUL e viraria 500.
+        nome_usuario = entrada.texto(request.POST.get('username'), maximo=150)
         usuario = Usuario.objects.filter(username=nome_usuario).first()
 
         if usuario is not None:
@@ -123,8 +124,9 @@ def redefinir(request, token):
         return render(request, 'recuperacao_senha/token_invalido.html', status=400)
 
     if request.method == 'POST':
-        senha_nova = request.POST.get('senha_nova', '')
-        confirmacao = request.POST.get('confirmacao', '')
+        # A senha mantem espacos (podem fazer parte dela), so remove byte nulo.
+        senha_nova = (request.POST.get('senha_nova') or '').replace('\x00', '')
+        confirmacao = (request.POST.get('confirmacao') or '').replace('\x00', '')
 
         if not senha_nova or senha_nova != confirmacao:
             # Confirmacao nao bate, nao e um evento grave de seguranca, mas ainda entra no log (issue #31).

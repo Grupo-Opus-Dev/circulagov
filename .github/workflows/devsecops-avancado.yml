@@ -1,0 +1,295 @@
+name: DevSecOps avancado
+
+# Esta esteira roda em cima da ja existente em testes.yml e cobre tres
+# vertentes que a outra nao cobria:
+#   - DAST (OWASP ZAP), que varre a aplicacao em execucao
+#   - Privacidade e dados sensiveis (Bearer), no codigo fonte
+#   - SBOM (Trivy), da imagem Docker de producao
+#
+# Todas as actions e imagens usadas estao fixadas por SHA ou digest de
+# commit, por causa do ataque a cadeia de suprimentos do proprio
+# trivy-action ocorrido em 03/2026. "@v0.X.Y" pode ser reescrito, um SHA
+# nao.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-avancado-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # -------------------------------------------------------------------
+  # 1. Privacidade / LGPD (Bearer), via CLI numa versao fixa.
+  #
+  # Usamos o CLI em container ao inves da action oficial do Bearer, que
+  # baixa um script da branch main do projeto Bearer a cada execucao (sem
+  # verificacao de integridade). Em um pipeline de seguranca da cadeia de
+  # suprimentos, isso e justamente o que estamos tentando evitar.
+  # -------------------------------------------------------------------
+  privacidade-bearer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Rodar o Bearer (bloqueia em HIGH ou CRITICAL)
+        # Imagem fixada por digest; sem o '@sha256:...' o v2.1.3 pode ser
+        # reescrito. A regra de 'path_traversal' do Bearer para python
+        # inclui os pontos onde abrimos arquivo de log de auditoria.
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src:ro \
+            bearer/bearer:v2.1.3@sha256:7ac5b10ccbca642fcfb312f8508634c02ba2f26ef932a3ea96c9074629ecade7 \
+            scan /src --severity critical,high --hide-progress-bar --exit-code 1
+
+      - name: Gerar relatorio em JSON (mesmo se o passo acima falhar)
+        if: always()
+        run: |
+          mkdir -p bearer
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src:ro -v "$PWD/bearer":/out \
+            bearer/bearer:v2.1.3@sha256:7ac5b10ccbca642fcfb312f8508634c02ba2f26ef932a3ea96c9074629ecade7 \
+            scan /src --format json --output /out/relatorio.json \
+            --hide-progress-bar --exit-code 0 || true
+
+      - name: Gerar relatorio de privacidade (PII e destinos)
+        # O Bearer tem dois tipos de relatorio. O passo acima roda o de
+        # seguranca (padrao). O de privacidade e outro: lista os dados
+        # pessoais encontrados, para onde vao e sob qual finalidade, que
+        # e o que importa para LGPD. Precisa de --report privacy, nao
+        # vem junto do relatorio de seguranca.
+        if: always()
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src:ro -v "$PWD/bearer":/out \
+            bearer/bearer:v2.1.3@sha256:7ac5b10ccbca642fcfb312f8508634c02ba2f26ef932a3ea96c9074629ecade7 \
+            scan /src --report privacy --format json \
+            --output /out/privacidade.json \
+            --hide-progress-bar --exit-code 0 || true
+
+      - name: Subir o relatorio como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: bearer-relatorio
+          path: bearer/
+
+  # -------------------------------------------------------------------
+  # 2. SBOM da imagem Docker (Trivy).
+  #
+  # Usamos v0.76.1 explicitamente: o default da action v0.36.0 e v0.70.0,
+  # e dois avisos de seguranca do Trivy (path traversal GHSA-mcj4-mphf-j9ff
+  # e o do plugin manager GHSA-8rc5-4fr6-64pw) foram corrigidos em 0.71.1
+  # e 0.72.0.
+  # -------------------------------------------------------------------
+  sbom-trivy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Construir a imagem da aplicacao (como no deploy)
+        run: docker build -t circulagov-ci:local .
+
+      - name: Instalar o Trivy direto do GitHub Releases
+        # O instalador oficial baixa o binario de https://get.trivy.dev, que
+        # parou de resolver DNS em 03/11/2026 (aquasecurity/setup-trivy#42).
+        # Enquanto o time nao arruma, pego o tarball direto do release na
+        # pagina de releases do Trivy e confiro o sha256 contra o valor do
+        # checksums.txt daquela mesma release. A versao continua sendo a
+        # v0.76.1, posterior as correcoes de GHSA-mcj4-mphf-j9ff (0.71.1) e
+        # GHSA-8rc5-4fr6-64pw (0.72.0).
+        run: |
+          VER=0.76.1
+          URL=https://github.com/aquasecurity/trivy/releases/download
+          curl -fsSL -o trivy.tar.gz "${URL}/v${VER}/trivy_${VER}_Linux-64bit.tar.gz"
+          echo "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0  trivy.tar.gz" | sha256sum -c -
+          tar xzf trivy.tar.gz trivy
+          sudo mv trivy /usr/local/bin/trivy
+          trivy --version
+
+      - name: Gerar SBOM CycloneDX
+        # skip-setup-trivy: a action nao precisa baixar o Trivy, ja esta no
+        # PATH. Fica usando o binario que acabamos de instalar.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          scan-type: image
+          image-ref: circulagov-ci:local
+          format: cyclonedx
+          output: sbom.cdx.json
+          skip-setup-trivy: true
+
+      - name: Confirmar o conteudo do SBOM
+        # Falha se o arquivo nao for CycloneDX valido ou se nao vier com
+        # componentes de verdade; evita que um "0 componentes" passe
+        # despercebido.
+        run: |
+          python3 - <<'PY'
+          import json
+          d = json.load(open('sbom.cdx.json'))
+          assert d['bomFormat'] == 'CycloneDX'
+          assert d['specVersion'].startswith('1.')
+          componentes = d.get('components', [])
+          print(f"SBOM OK: CycloneDX {d['specVersion']}, {len(componentes)} componentes")
+          assert len(componentes) >= 50, f"muito poucos componentes ({len(componentes)}); build suspeito"
+          PY
+
+      - name: Subir o SBOM como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+
+      - name: Procurar vulnerabilidades HIGH/CRITICAL na imagem
+        # --format cyclonedx desliga a busca de vulnerabilidade, e isto esta
+        # documentado na secao de SBOM do Trivy. Para ter a lista a gente
+        # precisa de um segundo scan, com --scanners vuln. --ignore-unfixed
+        # tira CVE sem correcao disponivel, que so o time do Debian pode
+        # arrumar, nao da pra fazer nada do nosso lado.
+        #
+        # .trivyignore no raiz do repositorio suprime CVE suspeitas de
+        # falso positivo (ver o proprio .trivyignore pra justificativa).
+        # Primeiro gero o JSON completo pro artefato (com --ignorefile ""
+        # pra NAO suprimir, senao o arquivo esconde o que foi ignorado e
+        # fica inutil como evidencia). Depois o scan que quebra o build,
+        # com --show-suppressed pra o log do Actions listar o que foi
+        # ignorado em vez de simplesmente omitir.
+        run: |
+          trivy image --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --ignorefile "" --format json \
+            --output trivy-vulnerabilidades.json circulagov-ci:local
+          trivy image --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --ignorefile .trivyignore --show-suppressed \
+            --exit-code 1 circulagov-ci:local
+
+      - name: Subir o relatorio de vulnerabilidades como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: trivy-vulnerabilidades
+          path: trivy-vulnerabilidades.json
+
+  # -------------------------------------------------------------------
+  # 3. DAST (OWASP ZAP) contra a aplicacao em execucao.
+  #
+  # O docker-compose do repositorio sobe a aplicacao em modo producao
+  # (DEBUG=False, com Gunicorn). Para o ZAP conseguir falar com ela, um
+  # proxy TLS ancora o mesmo cabecalho X-Forwarded-Proto que o nginx de
+  # producao usa. Sem isso, com DEBUG=False, o Django redireciona todo
+  # POST para HTTPS e nenhum passo de injecao testa nada.
+  # -------------------------------------------------------------------
+  dast-zap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Preparar .env de teste (chaves descartaveis)
+        run: |
+          {
+            echo "DEBUG=False"
+            echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
+            echo "CHAVE_CIFRAGEM_2FA=$(python3 -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
+            echo "CHAVE_INTEGRIDADE_LOGS=$(python3 -c 'import base64, os; print(base64.b64encode(os.urandom(32)).decode())')"
+            echo "DB_NAME=cg_dast"; echo "DB_USER=cg_dast"
+            echo "DB_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+            echo "DB_HOST=localhost"; echo "DB_PORT=5432"
+            echo "ALLOWED_HOSTS=localhost"
+            echo "CSRF_TRUSTED_ORIGINS=https://localhost:18443"
+          } > .env
+          # altera a porta publicada no compose pra nao bater com o padrao
+          sed -i 's/127.0.0.1:8000:8000/127.0.0.1:18000:8000/' docker-compose.yml
+          sed -i 's#127.0.0.1:8000#127.0.0.1:18000#; s/listen 8443/listen 18443/' deploy/dast/nginx-dast.conf
+
+      - name: Subir a aplicacao com docker compose
+        run: docker compose up -d --build
+
+      - name: Subir o proxy TLS que o ZAP vai bater
+        run: |
+          mkdir -p /tmp/certs
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout /tmp/certs/key.pem -out /tmp/certs/cert.pem \
+            -days 1 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost"
+          docker run -d --name proxy-tls --network host \
+            -v "$PWD/deploy/dast/nginx-dast.conf:/etc/nginx/nginx.conf:ro" \
+            -v /tmp/certs:/certs:ro nginx:1.24-alpine
+
+      - name: Esperar a aplicacao responder
+        run: |
+          for _ in $(seq 1 30); do
+            # || true porque, enquanto o nginx ainda nao atende, o curl sai
+            # com exit != 0 (code 7) e o 'set -e' do passo derrubaria o loop.
+            c=$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:18443/contas/login/ || true)
+            [ "$c" = 200 ] && exit 0
+            sleep 2
+          done
+          echo '--- aplicacao nao respondeu, logs do web: ---'
+          docker compose logs web | tail -40
+          echo '--- logs do proxy: ---'
+          docker logs proxy-tls | tail -20
+          exit 1
+
+      - name: Rodar o ZAP (bloqueia em risco ALTO, 28 regras em .zap/rules.tsv)
+        uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c  # v0.13.0
+        with:
+          target: https://localhost:18443
+          rules_file_name: .zap/rules.tsv
+          fail_action: true
+          allow_issue_writing: false
+          docker_name: ghcr.io/zaproxy/zaproxy:2.17.0@sha256:c2d63bbb2d907a5c5257914fb20e26e969c92b25f265def7f89f08203f912882
+          cmd_options: >-
+            -I -m 3
+            -z "-config scanner.maxScanDurationInMins=15 -config scanner.maxRuleDurationInMins=3"
+
+      - name: Bloquear alertas de risco alto
+        # O .zap/rules.tsv marca como FAIL as 28 regras HIGH listadas na
+        # pagina oficial de alertas, mas uma regra nova pode aparecer com
+        # risco alto sem estar nessa lista. Este passo olha o relatorio e
+        # falha se encontrar qualquer alerta com riskcode "3" (HIGH), seja
+        # qual for a regra. Promessa que esta no comentario do rules.tsv.
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          with open('report_json.json') as f:
+              d = json.load(f)
+          altos = []
+          for site in d.get('site', []):
+              for a in site.get('alerts', []):
+                  if a.get('riskcode') == '3':
+                      altos.append(f"  {a.get('pluginid')} {a.get('name')} x{a.get('count')}")
+          if altos:
+              print('Alerta(s) de risco alto encontrado(s):')
+              print('\n'.join(altos))
+              sys.exit(1)
+          print('Nenhum alerta de risco alto. OK.')
+          PY
+
+      - name: Mostrar o log da aplicacao mesmo se o ZAP falhar
+        if: always()
+        run: docker compose logs web | tail -80
+
+      - name: Subir o relatorio do ZAP como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: zap-relatorio
+          path: |
+            report_json.json
+            report_md.md
+            report_html.html

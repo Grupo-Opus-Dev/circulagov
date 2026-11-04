@@ -471,3 +471,40 @@ class TesteLimiteDeEmailsPorConta(TestCase):
         for _ in range(5):
             enviar_email_recuperacao(pedido, self.usuario, nova_conta=True)
         self.assertEqual(len(mail.outbox), 5)
+
+
+class TesteByteNuloNoNomeDeUsuario(TestCase):
+    """O PostgreSQL não aceita o caractere nulo em texto. Sem tratamento,
+    um nome de usuário com ele virava erro 500, achado pelo scan dinâmico
+    (ZAP) do pipeline de segurança."""
+
+    def setUp(self):
+        Usuario.objects.create_user(
+            username='usuario_teste', password='SenhaAntiga@123')
+
+    def test_nome_com_byte_nulo_recebe_a_resposta_generica(self):
+        resposta = self.client.post(
+            reverse('recuperacao_senha:solicitar'), {'username': 'ana\x00'})
+
+        self.assertRedirects(resposta, reverse('login'))
+
+    def test_resposta_e_igual_a_de_um_usuario_que_nao_existe(self):
+        """Não pode virar um jeito de descobrir contas: com ou sem o byte
+        nulo, quem não existe recebe exatamente o mesmo redirecionamento."""
+        com_nulo = self.client.post(
+            reverse('recuperacao_senha:solicitar'), {'username': 'x\x00'})
+        inexistente = self.client.post(
+            reverse('recuperacao_senha:solicitar'), {'username': 'nao_existe'})
+
+        self.assertEqual(com_nulo.status_code, inexistente.status_code)
+        self.assertEqual(com_nulo.url, inexistente.url)
+
+    def test_byte_nulo_na_senha_nova_nao_derruba_a_redefinicao(self):
+        usuario = Usuario.objects.get(username='usuario_teste')
+        _registro, valor_bruto = TokenRecuperacaoSenha.gerar(usuario)
+
+        resposta = self.client.post(
+            reverse('recuperacao_senha:redefinir', args=[valor_bruto]),
+            {'senha_nova': 'Abc\x00DefGhi@123', 'confirmacao': 'Abc\x00DefGhi@123'})
+
+        self.assertLess(resposta.status_code, 500)
