@@ -63,6 +63,22 @@ jobs:
             scan /src --format json --output /out/relatorio.json \
             --hide-progress-bar --exit-code 0 || true
 
+      - name: Gerar relatorio de privacidade (PII e destinos)
+        # O Bearer tem dois tipos de relatorio. O passo acima roda o de
+        # seguranca (padrao). O de privacidade e outro: lista os dados
+        # pessoais encontrados, para onde vao e sob qual finalidade, que
+        # e o que importa para LGPD. Precisa de --report privacy, nao
+        # vem junto do relatorio de seguranca.
+        if: always()
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src:ro -v "$PWD/bearer":/out \
+            bearer/bearer:v2.1.3@sha256:7ac5b10ccbca642fcfb312f8508634c02ba2f26ef932a3ea96c9074629ecade7 \
+            scan /src --report privacy --format json \
+            --output /out/privacidade.json \
+            --hide-progress-bar --exit-code 0 || true
+
       - name: Subir o relatorio como artefato
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
@@ -132,10 +148,32 @@ jobs:
           PY
 
       - name: Subir o SBOM como artefato
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: sbom-cyclonedx
           path: sbom.cdx.json
+
+      - name: Procurar vulnerabilidades HIGH/CRITICAL na imagem
+        # --format cyclonedx desliga a busca de vulnerabilidade, e isto esta
+        # documentado na secao de SBOM do Trivy. Para ter a lista a gente
+        # precisa de um segundo scan, com --scanners vuln. --ignore-unfixed
+        # tira CVE sem correcao disponivel, que so o time do Debian pode
+        # arrumar, nao da pra fazer nada do nosso lado. Primeiro gero o
+        # JSON (para ir pro artefato) e depois o scan que quebra o build.
+        run: |
+          trivy image --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --format json \
+            --output trivy-vulnerabilidades.json circulagov-ci:local
+          trivy image --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --exit-code 1 circulagov-ci:local
+
+      - name: Subir o relatorio de vulnerabilidades como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: trivy-vulnerabilidades
+          path: trivy-vulnerabilidades.json
 
   # -------------------------------------------------------------------
   # 3. DAST (OWASP ZAP) contra a aplicacao em execucao.
@@ -209,6 +247,30 @@ jobs:
           cmd_options: >-
             -I -m 3
             -z "-config scanner.maxScanDurationInMins=15 -config scanner.maxRuleDurationInMins=3"
+
+      - name: Bloquear alertas de risco alto
+        # O .zap/rules.tsv marca como FAIL as 28 regras HIGH listadas na
+        # pagina oficial de alertas, mas uma regra nova pode aparecer com
+        # risco alto sem estar nessa lista. Este passo olha o relatorio e
+        # falha se encontrar qualquer alerta com riskcode "3" (HIGH), seja
+        # qual for a regra. Promessa que esta no comentario do rules.tsv.
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          with open('report_json.json') as f:
+              d = json.load(f)
+          altos = []
+          for site in d.get('site', []):
+              for a in site.get('alerts', []):
+                  if a.get('riskcode') == '3':
+                      altos.append(f"  {a.get('pluginid')} {a.get('name')} x{a.get('count')}")
+          if altos:
+              print('Alerta(s) de risco alto encontrado(s):')
+              print('\n'.join(altos))
+              sys.exit(1)
+          print('Nenhum alerta de risco alto. OK.')
+          PY
 
       - name: Mostrar o log da aplicacao mesmo se o ZAP falhar
         if: always()
