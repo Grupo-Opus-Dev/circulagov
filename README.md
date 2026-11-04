@@ -48,6 +48,7 @@ Trabalho da disciplina **Políticas de Segurança da Informação**.
 | [docs/ANALISE_RISCOS.md](docs/ANALISE_RISCOS.md) | ativos, ameaças, contramedidas e risco residual |
 | [docs/TESTES_SEGURANCA.md](docs/TESTES_SEGURANCA.md) | cada ameaça ligada ao teste que a comprova |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | como o sistema foi colocado no ar e como atualizar |
+| [docs/REPRODUCAO.md](docs/REPRODUCAO.md) | comandos para conferir os testes e o TLS de forma independente |
 
 ## 🎯 Escopo entregue
 

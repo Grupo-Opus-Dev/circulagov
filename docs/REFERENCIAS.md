@@ -22,8 +22,8 @@ acessada, por ser de assinatura paga.
 
 ## 1. Hash de senha: parâmetros do Argon2id
 
-**Fonte:** OWASP. **Password storage cheat sheet**. OWASP Cheat Sheet Series,
-[s. l.], [s. d.]. Disponível em:
+**Fonte:** OWASP. **Password storage cheat sheet**. [S. l.]: OWASP Foundation,
+[202-]. (OWASP Cheat Sheet Series). Disponível em:
 https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html.
 Acesso em: 24 set. 2026.
 
@@ -139,7 +139,7 @@ parecer válida. Sem a chave, não.
 ## 5. Integridade do log: o encadeamento
 
 **Fonte:** SCHNEIER, B.; KELSEY, J. Secure audit logs to support computer
-forensics. **ACM Transactions on Information and System Security**, [s. l.],
+forensics. **ACM Transactions on Information and System Security**, New York,
 v. 2, n. 2, p. 159-176, maio 1999. DOI: 10.1145/317087.317089. Disponível em:
 https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf.
 Acesso em: 24 set. 2026.
@@ -371,13 +371,13 @@ M'RAIHI, D.; MACHANI, S.; PEI, M.; RYDELL, J. **TOTP**: time-based one-time
 password algorithm. [S. l.]: IETF, maio 2011. (RFC 6238). Disponível em:
 https://www.rfc-editor.org/rfc/rfc6238.txt. Acesso em: 24 set. 2026.
 
-OWASP. **Password storage cheat sheet**. OWASP Cheat Sheet Series, [s. l.],
-[s. d.]. Disponível em:
+OWASP. **Password storage cheat sheet**. [S. l.]: OWASP Foundation,
+[202-]. (OWASP Cheat Sheet Series). Disponível em:
 https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html.
 Acesso em: 24 set. 2026.
 
 SCHNEIER, B.; KELSEY, J. Secure audit logs to support computer forensics.
-**ACM Transactions on Information and System Security**, [s. l.], v. 2, n. 2,
+**ACM Transactions on Information and System Security**, New York, v. 2, n. 2,
 p. 159-176, maio 1999. DOI: 10.1145/317087.317089. Disponível em:
 https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf. Acesso
 em: 24 set. 2026.
@@ -410,9 +410,14 @@ também vale.
   uniforme. Como as RFCs trazem apenas as iniciais dos autores, abreviar em
   toda a lista mantém a uniformidade sem precisar inferir nome completo de
   ninguém.
-- **`[S. l.]` e `[s. d.]`.** Indicam, respectivamente, local e data não
-  identificados. As RFCs não têm cidade de publicação, e a página da OWASP é
-  atualizada continuamente, sem data fixa de edição.
+- **`[S. l.]` e `[202-]`.** `[S. l.]` indica local não identificado: as RFCs e a
+  página da OWASP não têm cidade de publicação. A norma de 2018 não usa mais
+  `[s. d.]`: quando nenhuma data pode ser identificada, pede uma data
+  aproximada entre colchetes. A página da OWASP é atualizada continuamente,
+  sem data de edição, e a versão consultada é desta década, daí `[202-]`.
+- **Local do periódico.** O ACM Transactions on Information and System
+  Security é publicado pela ACM em New York, então o local é informado em vez
+  de `[s. l.]`.
 - **RFC e NIST SP como série.** O identificador de série vai entre parênteses
   no fim, e não como parte do título.
 - **DOI no artigo de periódico.** Incluído porque é o identificador persistente
