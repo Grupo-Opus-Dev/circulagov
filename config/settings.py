@@ -205,6 +205,15 @@ LOGGING = {
             'handlers': ['console', 'arquivo_seguranca'],
             'level': 'INFO',
         },
+        # Erros 500 com o traceback, no log do container. O Django so mostra
+        # isso com DEBUG=True, entao em producao uma excecao virava um 500
+        # mudo e nao havia como descobrir a causa. Fica fora do arquivo
+        # assinado de proposito: traceback nao e evento de seguranca.
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
 
