@@ -163,14 +163,17 @@ jobs:
         #
         # .trivyignore no raiz do repositorio suprime CVE suspeitas de
         # falso positivo (ver o proprio .trivyignore pra justificativa).
-        # Primeiro gero o JSON (sem o ignore, pra ficar completo no
-        # artefato) e depois o scan que quebra o build (ja com o ignore).
+        # Primeiro gero o JSON completo pro artefato (com --ignorefile ""
+        # pra NAO suprimir, senao o arquivo esconde o que foi ignorado e
+        # fica inutil como evidencia). Depois o scan que quebra o build,
+        # com --show-suppressed pra o log do Actions listar o que foi
+        # ignorado em vez de simplesmente omitir.
         run: |
           trivy image --scanners vuln --severity HIGH,CRITICAL \
-            --ignore-unfixed --format json \
+            --ignore-unfixed --ignorefile "" --format json \
             --output trivy-vulnerabilidades.json circulagov-ci:local
           trivy image --scanners vuln --severity HIGH,CRITICAL \
-            --ignore-unfixed --ignorefile .trivyignore \
+            --ignore-unfixed --ignorefile .trivyignore --show-suppressed \
             --exit-code 1 circulagov-ci:local
 
       - name: Subir o relatorio de vulnerabilidades como artefato
