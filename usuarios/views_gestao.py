@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 from recuperacao_senha.models import MINUTOS_VALIDADE_TOKEN
 from recuperacao_senha.views import enviar_email_recuperacao
 
+from . import entrada
 from .decoradores import exige_gestor
 from .forms import FormularioEditarUsuario, FormularioNovoUsuario
 
@@ -38,7 +39,7 @@ def _consulta_com_relacoes():
 
 @exige_gestor
 def lista_usuarios(request):
-    busca = request.GET.get('busca', '').strip()
+    busca = entrada.texto(request.GET.get('busca'), maximo=150)
     usuarios = _consulta_com_relacoes()
 
     if busca:
