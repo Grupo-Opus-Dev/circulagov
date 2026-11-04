@@ -1,0 +1,40 @@
+# Regras do OWASP ZAP que BLOQUEIAM o build (usado com fail_action: true).
+#
+# Formato: ID <tab> ACAO <tab> (nome). Regra que nao esta aqui continua como
+# WARN: aparece no relatorio, mas nao derruba o build (o workflow passa -I).
+#
+# A lista abaixo e a das regras de risco ALTO (risk: High, status release)
+# nas paginas oficiais de alertas do ZAP (zaproxy.org/docs/alerts), conferida
+# em 03/11/2026. Regras cujo risco varia por achado nao tem esse campo nas
+# paginas e nao entram aqui. Para elas existe o passo "Bloquear alertas de
+# risco alto" do workflow, que le o relatorio e barra qualquer alerta alto,
+# seja qual for a regra.
+#
+7	FAIL	(Remote File Inclusion)
+10028	FAIL	(Off-site Redirect)
+10034	FAIL	(Heartbleed OpenSSL Vulnerability (Indicative))
+10062	FAIL	(PII Disclosure)
+20015	FAIL	(Heartbleed OpenSSL Vulnerability)
+20017	FAIL	(Source Code Disclosure - CVE-2012-1823)
+20018	FAIL	(Remote Code Execution - CVE-2012-1823)
+20020	FAIL	(PHP Version with Known Vulnerabilities)
+40009	FAIL	(Server Side Include)
+40012	FAIL	(Cross Site Scripting (Reflected))
+40018	FAIL	(SQL Injection)
+40019	FAIL	(SQL Injection - MySQL (Time Based))
+40020	FAIL	(SQL Injection - Hypersonic SQL (Time Based))
+40021	FAIL	(SQL Injection - Oracle (Time Based))
+40022	FAIL	(SQL Injection - PostgreSQL (Time Based))
+40026	FAIL	(Cross Site Scripting (DOM Based))
+40027	FAIL	(SQL Injection - MsSQL (Time Based))
+40045	FAIL	(Spring4Shell)
+40048	FAIL	(Remote Code Execution (React2Shell))
+90020	FAIL	(Remote OS Command Injection)
+90021	FAIL	(XPath Injection)
+90023	FAIL	(XML External Entity Attack)
+90024	FAIL	(Generic Padding Oracle)
+90034	FAIL	(Cloud Metadata Potentially Exposed)
+90035	FAIL	(Server Side Template Injection)
+90036	FAIL	(Server Side Template Injection (Blind))
+90037	FAIL	(Remote OS Command Injection (Time Based))
+110005	FAIL	(Personally Identifiable Information via WebSocket)
