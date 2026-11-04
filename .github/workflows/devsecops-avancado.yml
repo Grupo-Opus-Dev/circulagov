@@ -88,14 +88,33 @@ jobs:
       - name: Construir a imagem da aplicacao (como no deploy)
         run: docker build -t circulagov-ci:local .
 
+      - name: Instalar o Trivy direto do GitHub Releases
+        # O instalador oficial baixa o binario de https://get.trivy.dev, que
+        # parou de resolver DNS em 03/11/2026 (aquasecurity/setup-trivy#42).
+        # Enquanto o time nao arruma, pego o tarball direto do release na
+        # pagina de releases do Trivy e confiro o sha256 contra o valor do
+        # checksums.txt daquela mesma release. A versao continua sendo a
+        # v0.76.1, posterior as correcoes de GHSA-mcj4-mphf-j9ff (0.71.1) e
+        # GHSA-8rc5-4fr6-64pw (0.72.0).
+        run: |
+          VER=0.76.1
+          URL=https://github.com/aquasecurity/trivy/releases/download
+          curl -fsSL -o trivy.tar.gz "${URL}/v${VER}/trivy_${VER}_Linux-64bit.tar.gz"
+          echo "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0  trivy.tar.gz" | sha256sum -c -
+          tar xzf trivy.tar.gz trivy
+          sudo mv trivy /usr/local/bin/trivy
+          trivy --version
+
       - name: Gerar SBOM CycloneDX
+        # skip-setup-trivy: a action nao precisa baixar o Trivy, ja esta no
+        # PATH. Fica usando o binario que acabamos de instalar.
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: image
           image-ref: circulagov-ci:local
           format: cyclonedx
           output: sbom.cdx.json
-          version: 'v0.76.1'
+          skip-setup-trivy: true
 
       - name: Confirmar o conteudo do SBOM
         # Falha se o arquivo nao for CycloneDX valido ou se nao vier com
