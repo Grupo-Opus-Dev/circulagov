@@ -86,6 +86,21 @@ Referrer-Policy: same-origin
 Cross-Origin-Opener-Policy: same-origin
 ```
 
+### Nova captura, 04/11/2026
+
+A captura foi refeita depois da v1.5.1, com o comando de cada verificação ao
+lado da saída, para que qualquer pessoa possa repetir. Arquivo completo em
+[`evidencias/17-evidencia-tls-producao-2026-11-04.txt`](evidencias/17-evidencia-tls-producao-2026-11-04.txt),
+e o passo a passo em [REPRODUCAO.md](REPRODUCAO.md).
+
+O resultado é o mesmo de 03/10/2026, com três verificações a mais:
+
+- **versões antigas recusadas:** TLS 1.0 e 1.1 não completam o handshake;
+- **TLS 1.2 aceito,** para compatibilidade, só com cifra AEAD e troca de chave
+  efêmera (`ECDHE-ECDSA-AES256-GCM-SHA384`). Um cliente atual negocia TLS 1.3;
+- **`Content-Security-Policy`** presente, sem `unsafe-inline`, e o `/admin/login/`
+  redirecionando para o login da aplicação, que tem o segundo fator.
+
 ### O que esta evidência não cobre
 
 - **HSTS preload.** O cabeçalho declara `preload`, mas o domínio, um
