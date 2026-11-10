@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Relatório Técnico: Esteira DevSecOps do CirculaGov</title>
+<style>
+  @page { size: A4; margin: 18mm 17mm 18mm 17mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1f2937; margin: 0; }
+  h1 { font-size: 19pt; color: #1e3a8a; margin: 0 0 4px; }
+  h2 { font-size: 13.5pt; color: #1e3a8a; margin: 20px 0 6px; border-bottom: 2px solid #dbeafe; padding-bottom: 3px; }
+  h3 { font-size: 11pt; color: #1e3a8a; margin: 14px 0 4px; }
+  p { margin: 5px 0 7px; text-align: justify; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; background: #f1f5f9; padding: 0 3px; border-radius: 3px; }
+  pre { font-family: Consolas, "Courier New", monospace; font-size: 8.4pt; background: #0f172a; color: #e2e8f0; padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; margin: 6px 0 10px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 9.2pt; }
+  th, td { border: 1px solid #cbd5e1; padding: 4px 6px; vertical-align: top; text-align: left; }
+  th { background: #eff6ff; color: #1e3a8a; }
+  .capa { border: 2px solid #1e3a8a; border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; }
+  .sub { color: #475569; margin: 0 0 10px; }
+  .meta td { border: none; padding: 1px 8px 1px 0; font-size: 9.6pt; }
+  .meta td:first-child { color: #475569; white-space: nowrap; }
+  figure { margin: 8px 0 12px; text-align: center; page-break-inside: avoid; }
+  figure img { max-width: 100%; border: 1px solid #cbd5e1; border-radius: 4px; }
+  figcaption { font-size: 8.8pt; color: #475569; margin-top: 3px; }
+  .ok { color: #166534; font-weight: 600; }
+  .falha { color: #b91c1c; font-weight: 600; }
+  .nota { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 6px 10px; font-size: 9.4pt; margin: 8px 0; }
+  .quebra { page-break-before: always; }
+  ul { margin: 4px 0 8px 18px; padding: 0; }
+  li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <h1>Relatório Técnico: Esteira DevSecOps do CirculaGov</h1>
+  <p class="sub">Atividade Devops2: automação de segurança com GitHub Actions</p>
+  <table class="meta">
+    <tr><td>Sistema</td><td>CirculaGov, plataforma de identidade e proteção de dados pessoais (Django 5.2, PostgreSQL 17)</td></tr>
+    <tr><td>Instituição</td><td>Universidade de Mogi das Cruzes (UMC)</td></tr>
+    <tr><td>Integrantes</td><td>Emanuel Victor (@Manuzel); Everson Duarte de Souza (@everson-duarte); Maycon Wendyl da Silva Pereira (@wendylmaycon); Vitor Dias Santana (@vitin2505)</td></tr>
+    <tr><td>Repositório</td><td>https://github.com/Grupo-Opus-Dev/circulagov</td></tr>
+    <tr><td>Workflow</td><td><code>.github/workflows/devsecops-pipeline.yml</code></td></tr>
+    <tr><td>Release</td><td>v1.6.0, https://github.com/Grupo-Opus-Dev/circulagov/releases/tag/v1.6.0</td></tr>
+    <tr><td>Data</td><td>10/11/2026</td></tr>
+  </table>
+</div>
+
+<h2>1. Introdução e contextualização</h2>
+<p>Em um ciclo de desenvolvimento tradicional, a segurança é verificada no fim, perto da entrega, quando uma falha já está misturada a outras mudanças e custa mais para encontrar e corrigir. A abordagem DevSecOps (ou SecDevOps) desloca essa verificação para o início: cada alteração no código passa, de forma automática, pelas mesmas checagens de segurança, antes de chegar à branch principal.</p>
+<p>No CirculaGov, isso importa por três motivos. O sistema guarda dados pessoais de alunos, sob a LGPD. Ele depende de chaves de criptografia (AES-GCM para o segundo fator e HMAC para o log) que não podem vazar. E o grupo tem quatro integrantes alterando o mesmo código. A esteira automatizada transforma as diretrizes de segurança do documento de Requisitos em verificações que rodam sozinhas e deixam registro, em vez de depender da atenção de quem revisa.</p>
+
+<h2>2. Ferramentas adotadas</h2>
+<p>O workflow <code>devsecops-pipeline.yml</code> roda em todo Pull Request, em todo push na <code>main</code>, uma vez por semana (para pegar CVE novas sem mudança de código) e sob demanda. São quatro jobs independentes, em paralelo:</p>
+<table>
+  <tr><th>Vertente</th><th>Ferramenta e versão</th><th>O que verifica</th><th>Bloqueia quando</th></tr>
+  <tr><td>Segredos</td><td>TruffleHog 3.99.8 (imagem fixada por digest)</td><td>Todo o histórico do Git (<code>fetch-depth: 0</code>), não só o último commit</td><td>Encontra qualquer segredo, verificado ou não (código de saída 183)</td></tr>
+  <tr><td>SCA</td><td>Trivy 0.76.1 (binário conferido por sha256)</td><td>CVE nas dependências do <code>requirements.txt</code></td><td>CVE de severidade HIGH ou CRITICAL (<code>--exit-code 1</code>)</td></tr>
+  <tr><td>SAST</td><td>Semgrep 1.184.0 (open-source)</td><td>Regras <code>p/python</code>, <code>p/django</code> e <code>p/owasp-top-ten</code></td><td>Achado de severidade ERROR, a faixa alta do Semgrep (<code>--error</code>)</td></tr>
+  <tr><td>SAST (bônus)</td><td>GitHub CodeQL 4.39.3</td><td>Suíte <code>security-extended</code> para Python, com análise de fluxo de dados</td><td>Achado com <code>security-severity</code> de 7,0 ou mais, faixas alta e crítica do CVSS</td></tr>
+</table>
+
+<h3>Justificativa das escolhas</h3>
+<ul>
+  <li><b>TruffleHog:</b> lê o histórico inteiro, o que importa porque um segredo apagado num commit posterior continua vazado no anterior. Os detectores padrão reconhecem chaves de provedores (AWS, GitHub e outros), mas não as chaves do projeto, que são só base64 de 32 bytes. Por isso o grupo criou um detector próprio em <code>.trufflehog.yml</code> para <code>CHAVE_CIFRAGEM_2FA</code>, <code>CHAVE_INTEGRIDADE_LOGS</code> e <code>SECRET_KEY</code> escrita no código. O padrão foi conferido contra todo o histórico, sem nenhum falso positivo.</li>
+  <li><b>Trivy:</b> o grupo já usava o Trivy na esteira de SBOM da imagem Docker, então a mesma base de vulnerabilidades cobre dependências e imagem. Um passo de conferência faz o job falhar se o Trivy não ler o <code>requirements.txt</code>, para que "0 vulnerabilidades" nunca signifique "não li nada".</li>
+  <li><b>Semgrep:</b> a versão open-source roda sem conta, tem regras específicas para Django e executa em menos de 40 segundos. A opção <code>--metrics=off</code> impede o envio de dados ao fornecedor.</li>
+  <li><b>CodeQL:</b> como o repositório é público, foi incluído como bônus. Ele segue o caminho do dado desde a requisição até a função perigosa, o que o Semgrep open-source faz de forma limitada. O CodeQL não falha o build sozinho, então um passo lê o arquivo SARIF e sai com código 1 se houver alerta alto ou crítico.</li>
+</ul>
+
+<h3>Política de bloqueio</h3>
+<p>Cada job termina com código de saída diferente de zero quando encontra falha alta ou crítica. Os quatro jobs foram incluídos nas checagens obrigatórias da regra de proteção da <code>main</code>, junto das quatro que o projeto já tinha (testes, DAST com ZAP, SBOM com Trivy e privacidade com Bearer). Assim, um Pull Request com achado não pode ser mesclado. Achados de severidade média ou baixa aparecem no painel de segurança, mas não bloqueiam.</p>
+<p>Todas as actions, imagens e ferramentas estão fixadas por SHA de commit, digest ou versão exata. Uma tag como <code>@v1</code> pode ser reescrita depois, como a esteira avançada do projeto registra ter acontecido com o <code>trivy-action</code> em março de 2026. Um SHA não pode ser reescrito.</p>
+
+<h2>3. Integração com o documento de Requisitos</h2>
+<p>A esteira não substitui os requisitos, mas verifica continuamente que eles não regridem. A tabela liga os itens do documento base ao que é conferido automaticamente a cada mudança.</p>
+<table>
+  <tr><th style="width:28%">Requisito</th><th>Como a esteira protege ou audita</th></tr>
+  <tr><td>3.6 Chaves criptográficas protegidas</td><td>O TruffleHog, com o detector próprio, impede que as chaves AES e HMAC sejam escritas no código ou em qualquer commit. As chaves vivem só no <code>.env</code> do servidor.</td></tr>
+  <tr><td>3.4 e 3.5 Criptografia em repouso e algoritmo adequado</td><td>O CodeQL (<code>security-extended</code>) e o Semgrep têm regras para algoritmos fracos e hash inadequado de dado sensível, que acusariam uma troca do AES-GCM ou do Argon2id por algo inseguro.</td></tr>
+  <tr><td>1.1 a 1.4 Hash de senhas</td><td>Uma alteração que passasse a guardar senha com hash fraco seria acusada pelo SAST. O Trivy acompanha as CVE do <code>argon2-cffi</code> e do <code>cryptography</code>.</td></tr>
+  <tr><td>1.x e 2.x Autenticação e recuperação de senha</td><td>O SAST analisa as views de login, 2FA e recuperação, que recebem dado do usuário. Os alertas de injeção em log encontrados (seção 4.4) estão justamente nessas views.</td></tr>
+  <tr><td>3.1 a 3.3 Comunicação segura</td><td>Complementa a esteira de testes, que valida a configuração de produção com <code>DEBUG=False</code> (HTTPS obrigatório, cookies seguros e HSTS).</td></tr>
+  <tr><td>Bloco 4, LGPD</td><td>Vazamento de credencial expõe dados pessoais. O TruffleHog reduz esse risco, e a esteira de privacidade (Bearer) procura dado pessoal em log e código.</td></tr>
+  <tr><td>5.3 Proteção contra alteração dos logs</td><td>O CodeQL acusou que o nome de usuário vai ao log de console sem neutralizar quebras de linha, o que permitiria forjar linhas fora do arquivo assinado (seção 4.4).</td></tr>
+  <tr><td>6.9 e 6.10 Testes de segurança e resultados documentados</td><td>Cada execução fica registrada no GitHub Actions, com data, commit e relatórios em JSON e SARIF como artefatos. Isso é uma trilha de auditoria contínua dos testes de segurança.</td></tr>
+</table>
+<p>Do ponto de vista de conformidade, a regra de proteção da <code>main</code> garante que nenhuma mudança chegue à produção sem passar pelas oito checagens. O histórico de execuções mostra, para qualquer versão, quais verificações rodaram e com qual resultado.</p>
+
+<h2>4. Evidências de funcionamento</h2>
+
+<h3>4.1 Esteira verde na branch principal</h3>
+<p>Depois do merge do Pull Request #120, a esteira rodou na <code>main</code> (commit <code>d26565a</code>) com os quatro jobs aprovados. Nos logs: o TruffleHog leu 679 blocos do histórico (718.548 bytes) com 0 segredos; o Trivy leu o <code>requirements.txt</code> com 0 CVE alta ou crítica; o Semgrep rodou 70 regras em 160 arquivos com 0 achados; e o CodeQL encontrou 3 alertas, nenhum alto ou crítico.</p>
+<figure>
+  <img src="prints/01-esteira-verde-na-main.jpg" alt="Esteira verde na main" style="width:78%">
+  <figcaption>Figura 1. Execução #9 do DevSecOps pipeline na main, com os quatro jobs aprovados. https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/42741498987</figcaption>
+</figure>
+
+<h3>4.2 Prova do bloqueio</h3>
+<p>Para demonstrar que a política bloqueia de fato, o grupo abriu um Pull Request descartável (#121), que nunca foi mesclado, com três problemas plantados de propósito: uma chave AES inventada escrita no código, código com injeção de comando e execução de entrada do usuário, e o Django rebaixado para a versão 3.2.0. Os quatro jobs falharam pelo motivo esperado.</p>
+<table>
+  <tr><th>Job</th><th>O que encontrou</th><th>Saída</th></tr>
+  <tr><td>Segredos (TruffleHog)</td><td>A chave plantada, pelo detector próprio <code>chave-aes-ou-hmac-do-circulagov</code>, em <code>inseguro/exemplo_vulneravel.py</code>, linha 11</td><td class="falha">código 183</td></tr>
+  <tr><td>SCA (Trivy)</td><td>22 CVE no Django 3.2.0: 16 HIGH e 6 CRITICAL, entre elas a CVE-2021-35042 (injeção de SQL)</td><td class="falha">código 1</td></tr>
+  <tr><td>SAST (Semgrep)</td><td>5 achados bloqueantes, como <code>command-injection-os-system</code> e <code>subprocess-injection</code></td><td class="falha">código 1</td></tr>
+  <tr><td>SAST (CodeQL)</td><td>3 achados críticos: <code>py/command-line-injection</code> (nota 9,8, duas vezes) e <code>py/code-injection</code> (9,3)</td><td class="falha">código 1</td></tr>
+</table>
+<figure>
+  <img src="prints/02-bloqueio-quatro-jobs-vermelhos.jpg" alt="Quatro jobs vermelhos" style="width:70%">
+  <figcaption>Figura 2. Execução #7 no PR de teste: os quatro jobs falharam, com os códigos de saída nas anotações. https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/42740097021</figcaption>
+</figure>
+<p>Com as checagens obrigatórias, o GitHub marcou o Pull Request como bloqueado para merge. Saída da API do GitHub, capturada em 09/11/2026:</p>
+<pre>$ gh pr view 121 --json mergeStateStatus
+BLOCKED
+
+$ gh pr checks 121 --required
+SAST (CodeQL)            fail
+SAST (Semgrep)           fail
+SCA (Trivy)              fail
+Segredos (TruffleHog)    fail
+dast-zap                 fail
+privacidade-bearer       fail
+sbom-trivy               fail
+testes                   fail</pre>
+<p>Mitigação de cada achado do teste, caso fosse código real: remover a chave do código e de todo o histórico, trocar a chave comprometida e lê-la só do ambiente; atualizar o Django para uma versão corrigida (a 5.2.17, em uso no projeto); nunca passar entrada do usuário para o shell, usando lista de argumentos sem <code>shell=True</code> e uma lista fechada de comandos permitidos; e nunca usar <code>eval</code> sobre entrada externa. O Pull Request foi fechado sem merge e a branch, apagada.</p>
+
+<figure>
+  <img src="prints/03-historico-verde-e-vermelho.jpg" alt="Histórico do workflow" style="width:72%">
+  <figcaption>Figura 3. Histórico do workflow: execuções verdes no PR #120 e na main, vermelhas no PR de teste #121.</figcaption>
+</figure>
+
+<h3>4.3 A prova encontrou um defeito na própria esteira</h3>
+<p>Na primeira execução do teste, o CodeQL encontrou os três achados críticos, mas o job passou. A causa: o passo de bloqueio procurava a nota de severidade em <code>tool.driver</code>, e o SARIF do CodeQL guarda as regras em <code>tool.extensions</code>. Do jeito que estava, o CodeQL nunca bloquearia nada. O passo foi corrigido para resolver cada regra pela referência do achado e, se não conseguir resolver alguma, falhar em vez de deixar passar. Isso mostra por que uma esteira de segurança precisa de um teste negativo, e não só de execuções verdes.</p>
+<p>Também durante o teste, a proteção contra segredos do próprio GitHub (push protection) recusou o envio de uma chave inventada no formato da AWS. É uma camada a mais, antes mesmo da esteira. O grupo não usou o link de liberação. Trocou o teste por uma chave no formato das chaves do projeto, que só o detector próprio reconhece.</p>
+
+<h3>4.4 Alertas reais e como foram ou serão mitigados</h3>
+<p><b>CVE na imagem Docker (corrigida).</b> Durante a integração, a esteira de SBOM passou a apontar duas CVE HIGH na <code>zlib</code> da imagem base <code>python:3.13-slim</code> (CVE-2026-76844 e CVE-2026-85091). O Debian já havia publicado a correção, mas a imagem base ainda não tinha sido reconstruída. Como a checagem é obrigatória, nenhum Pull Request podia ser mesclado. A mitigação foi aplicar as atualizações de segurança do Debian no build (<code>apt-get upgrade</code> no <code>Dockerfile</code>), confirmada no log do build pela instalação da versão corrigida <code>1:1.3.dfsg+really1.3.1-1+deb13u1</code>. A imagem foi reconstruída em produção.</p>
+<p><b>Alertas do CodeQL no painel de segurança (abertos, severidade média).</b> A análise da <code>main</code> deixou três alertas de <i>Log Injection</i> (<code>py/log-injection</code>):</p>
+<table>
+  <tr><th>Alerta</th><th>Local</th><th>Valor do usuário registrado</th></tr>
+  <tr><td>#4</td><td><code>usuarios/views.py:33</code></td><td>nome de usuário no bloqueio por força bruta</td></tr>
+  <tr><td>#5</td><td><code>recuperacao_senha/views.py:62</code></td><td>nome de usuário no pedido de recuperação</td></tr>
+  <tr><td>#6</td><td><code>usuarios/views_gestao.py:79</code></td><td>nome de usuário da conta criada pela gestão</td></tr>
+</table>
+<p>Análise: o arquivo de log assinado já está protegido, porque o handler que calcula o HMAC troca as quebras de linha por espaço antes de gravar. Mas o mesmo logger também escreve no console, que aparece no <code>docker logs</code>, e ali a mensagem sai sem tratamento. Um nome de usuário com quebra de linha conseguiria simular uma linha falsa nesse registro. Mitigação: um filtro no logger de segurança que neutralize CR e LF nos valores antes de qualquer saída, e não só dentro do handler do arquivo, com teste automatizado que envie um nome com quebra de linha e confira que nenhuma linha extra aparece.</p>
+<p><b>Dependabot.</b> Os alertas do Dependabot estão ativos no repositório, e não há nenhum alerta aberto (consulta à API em 09/11/2026).</p>
+
+<h2>5. Conclusão e limitações</h2>
+<p>A esteira cumpre as três vertentes pedidas, com o CodeQL como bônus, e bloqueia o merge em falhas altas ou críticas. A eficácia foi comprovada nos dois sentidos: verde na <code>main</code> e vermelha diante de problemas reais plantados. Na prática, ela já encontrou uma CVE nova na imagem de produção e três pontos de injeção em log, nenhum deles conhecido pelo grupo antes.</p>
+<p>Limitações conhecidas: o TruffleHog só reconhece formatos conhecidos mais os do detector próprio; o Semgrep open-source analisa um arquivo por vez, sem seguir o dado entre arquivos; no teste, o CodeQL só reconheceu a entrada do usuário depois que as funções foram ligadas a rotas do Django; e achados de severidade média não bloqueiam o merge, por decisão de política, ficando no painel para tratamento.</p>
+
+</body>
+</html>
