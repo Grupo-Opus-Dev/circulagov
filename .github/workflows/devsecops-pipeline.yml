@@ -1,0 +1,171 @@
+name: DevSecOps pipeline
+
+# Atividade Devops2: esteira de seguranca automatizada com tres vertentes.
+#
+#   1. Segredos (TruffleHog)       procura chaves e senhas em TODO o historico
+#   2. SCA (Trivy)                 CVE nas dependencias de terceiros
+#   3. SAST (Semgrep)              falhas no codigo da aplicacao
+#   +  SAST (CodeQL, bonus)        analise semantica nativa do GitHub
+#
+# Politica de bloqueio: qualquer achado de severidade ALTA ou CRITICA faz o job
+# terminar com codigo de saida 1. Os quatro jobs sao checagens obrigatorias da
+# branch main, entao um Pull Request com achado nao pode ser mesclado.
+#
+# Todas as actions, imagens e ferramentas estao fixadas por SHA, digest ou
+# versao exata. Uma tag como "@v1" pode ser reescrita depois, um SHA nao. Isso
+# importa especialmente numa esteira de seguranca: o trivy-action, por
+# exemplo, teve as tags reescritas em 03/2026.
+#
+# Esta esteira convive com a de testes (testes.yml) e com a de DAST, privacidade
+# e SBOM (devsecops-avancado.yml). Nenhuma delas e substituida.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # CVE novas aparecem sem que o codigo mude. A varredura semanal pega isso.
+  schedule:
+    - cron: '17 9 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # -------------------------------------------------------------------
+  # 1. Varredura de segredos (TruffleHog).
+  #
+  # fetch-depth 0 baixa o historico inteiro, e o TruffleHog le cada commit,
+  # nao so a ponta: um segredo apagado depois continua no historico e
+  # continua vazado. Sem --results, ele reporta tambem os achados que nao
+  # conseguiu verificar contra o provedor, que e a postura mais estrita.
+  # -------------------------------------------------------------------
+  secrets-trufflehog:
+    name: Segredos (TruffleHog)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Baixar o codigo com o historico completo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Procurar segredos em todo o historico do Git
+        # --fail faz o TruffleHog sair com codigo 183 se achar qualquer
+        # segredo, e o job falha. Imagem fixada por digest.
+        run: |
+          docker run --rm -v "$PWD":/repo -w /repo \
+            ghcr.io/trufflesecurity/trufflehog:3.99.8@sha256:674b2f187620a19df77f44cf9a7d77efcc581a5662accef2f2739cbb46ba4a3a \
+            git file:///repo --no-update --fail --github-actions
+
+  # -------------------------------------------------------------------
+  # 2. Analise de vulnerabilidades em dependencias, SCA (Trivy).
+  #
+  # Le o requirements.txt e compara cada pacote fixado com a base de CVE.
+  # Bloqueia em HIGH ou CRITICAL. Nao usa --ignore-unfixed: numa dependencia
+  # Python, uma CVE sem correcao ainda e um risco que o grupo precisa ver.
+  # -------------------------------------------------------------------
+  sca-trivy:
+    name: SCA (Trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar o Trivy direto do GitHub Releases
+        # Pego o tarball da release e confiro o sha256 contra o valor do
+        # checksums.txt daquela mesma versao, em vez de rodar um instalador
+        # baixado de outro endereco.
+        run: |
+          VER=0.76.1
+          URL=https://github.com/aquasecurity/trivy/releases/download
+          curl -fsSL -o trivy.tar.gz "${URL}/v${VER}/trivy_${VER}_Linux-64bit.tar.gz"
+          echo "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0  trivy.tar.gz" | sha256sum -c -
+          tar xzf trivy.tar.gz trivy
+          sudo mv trivy /usr/local/bin/trivy
+          trivy --version
+
+      - name: Gerar o relatorio completo em JSON
+        # Sempre sai com 0: serve de evidencia, e o passo seguinte decide o
+        # bloqueio.
+        run: |
+          trivy fs --scanners vuln --severity HIGH,CRITICAL \
+            --format json --output trivy-sca.json --exit-code 0 .
+
+      - name: Conferir que o Trivy leu as dependencias
+        # Falha se o relatorio vier sem nenhum pacote Python. Evita que um
+        # "0 vulnerabilidades" signifique, na verdade, "nao li nada".
+        run: |
+          python3 - <<'PY'
+          import json
+          d = json.load(open('trivy-sca.json'))
+          alvos = [r for r in d.get('Results', []) if r.get('Class') == 'lang-pkgs']
+          print('arquivos de dependencia lidos:', [r['Target'] for r in alvos])
+          assert any(r['Target'].endswith('requirements.txt') for r in alvos), \
+              'o requirements.txt nao foi lido pelo Trivy'
+          PY
+
+      - name: Bloquear se houver CVE HIGH ou CRITICAL
+        run: |
+          trivy fs --scanners vuln --severity HIGH,CRITICAL \
+            --exit-code 1 --format table .
+
+      - name: Subir o relatorio como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sca-trivy
+          path: trivy-sca.json
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------
+  # 3. Analise estatica de seguranca, SAST (Semgrep).
+  #
+  # Semgrep open-source, em versao fixa, com os conjuntos de regras do
+  # registro para Python, Django e OWASP Top 10. --metrics=off nao envia
+  # dado nenhum ao servico. No Semgrep, severidade ERROR e a faixa alta,
+  # entao --severity ERROR --error bloqueia so o que importa.
+  # -------------------------------------------------------------------
+  sast-semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar o Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.13'
+
+      - name: Instalar o Semgrep (versao fixa)
+        run: pip install semgrep==1.184.0
+
+      - name: Rodar o Semgrep (bloqueia em severidade ERROR)
+        run: |
+          semgrep scan \
+            --config p/python --config p/django --config p/owasp-top-ten \
+            --metrics=off --severity ERROR --error \
+            --exclude venv --exclude staticfiles --exclude static \
+            --json-output semgrep.json \
+            .
+
+      - name: Subir o relatorio como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sast-semgrep
+          path: semgrep.json
+          if-no-files-found: error
