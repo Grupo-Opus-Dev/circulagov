@@ -8,7 +8,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # libpq e a biblioteca cliente do PostgreSQL, exigida pelo psycopg.
+#
+# O upgrade aplica as correcoes de seguranca do Debian que sairam depois da
+# ultima reconstrucao da imagem base python:3.13-slim. Sem ele, a imagem herda
+# pacotes com CVE ja corrigida: foi o caso da zlib em 11/2026, apontada pelo
+# Trivy (CVE-2026-76844 e CVE-2026-85091, HIGH).
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
