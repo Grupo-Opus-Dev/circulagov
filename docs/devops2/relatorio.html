@@ -142,6 +142,10 @@ testes                   fail</pre>
   <tr><td>#5</td><td><code>recuperacao_senha/views.py:62</code></td><td>nome de usuário no pedido de recuperação</td></tr>
   <tr><td>#6</td><td><code>usuarios/views_gestao.py:79</code></td><td>nome de usuário da conta criada pela gestão</td></tr>
 </table>
+<figure>
+  <img src="prints/04-alertas-codeql.png" alt="Alertas do CodeQL no painel de segurança" style="width:92%">
+  <figcaption>Figura 4. Painel Security, Code scanning: os três alertas de Log Injection, de severidade média, abertos na main.</figcaption>
+</figure>
 <p>Análise: o arquivo de log assinado já está protegido, porque o handler que calcula o HMAC troca as quebras de linha por espaço antes de gravar. Mas o mesmo logger também escreve no console, que aparece no <code>docker logs</code>, e ali a mensagem sai sem tratamento. Um nome de usuário com quebra de linha conseguiria simular uma linha falsa nesse registro. Mitigação: um filtro no logger de segurança que neutralize CR e LF nos valores antes de qualquer saída, e não só dentro do handler do arquivo, com teste automatizado que envie um nome com quebra de linha e confira que nenhuma linha extra aparece.</p>
 <p><b>Dependabot.</b> Os alertas do Dependabot estão ativos no repositório, e não há nenhum alerta aberto (consulta à API em 09/11/2026).</p>
 
