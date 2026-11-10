@@ -169,3 +169,69 @@ jobs:
           name: sast-semgrep
           path: semgrep.json
           if-no-files-found: error
+
+  # -------------------------------------------------------------------
+  # 4. Bonus: analise semantica do CodeQL (permitida em repositorio publico).
+  #
+  # Roda a suite "security-extended" para Python e sobe os alertas para a
+  # aba Security do repositorio. O CodeQL sozinho nao falha o job quando
+  # acha alerta, entao o passo final le o SARIF e termina com codigo 1 se
+  # existir achado com security-severity 7.0 ou mais, que e a faixa ALTA
+  # (7.0 a 8.9) e CRITICA (9.0 a 10.0) do CVSS.
+  # -------------------------------------------------------------------
+  sast-codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Iniciar o CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066  # v4.39.3
+        with:
+          languages: python
+          queries: security-extended
+
+      - name: Analisar
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066  # v4.39.3
+        with:
+          category: /language:python
+          output: sarif-results
+
+      - name: Bloquear se houver alerta de severidade alta ou critica
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys
+          bloqueantes = []
+          total = 0
+          for caminho in glob.glob('sarif-results/*.sarif'):
+              run = json.load(open(caminho))['runs'][0]
+              regras = {r['id']: r for r in run['tool']['driver'].get('rules', [])}
+              for achado in run.get('results', []):
+                  total += 1
+                  props = regras.get(achado['ruleId'], {}).get('properties', {})
+                  nota = float(props.get('security-severity', 0))
+                  if nota >= 7.0:
+                      local = achado['locations'][0]['physicalLocation']
+                      bloqueantes.append((nota, achado['ruleId'],
+                          local['artifactLocation']['uri'],
+                          local.get('region', {}).get('startLine')))
+          print(f'achados no total: {total}; alta ou critica: {len(bloqueantes)}')
+          for nota, regra, arquivo, linha in sorted(bloqueantes, reverse=True):
+              print(f'  {nota:>4}  {regra}  {arquivo}:{linha}')
+          sys.exit(1 if bloqueantes else 0)
+          PY
+
+      - name: Subir o SARIF como artefato
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sast-codeql
+          path: sarif-results
+          if-no-files-found: error
