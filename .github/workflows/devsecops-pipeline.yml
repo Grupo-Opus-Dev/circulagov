@@ -58,11 +58,13 @@ jobs:
 
       - name: Procurar segredos em todo o historico do Git
         # --fail faz o TruffleHog sair com codigo 183 se achar qualquer
-        # segredo, e o job falha. Imagem fixada por digest.
+        # segredo, e o job falha. Imagem fixada por digest. O --config soma
+        # os detectores de .trufflehog.yml, que reconhecem as chaves AES e
+        # HMAC do projeto (base64 puro, que nenhum detector padrao conhece).
         run: |
           docker run --rm -v "$PWD":/repo -w /repo \
             ghcr.io/trufflesecurity/trufflehog:3.99.8@sha256:674b2f187620a19df77f44cf9a7d77efcc581a5662accef2f2739cbb46ba4a3a \
-            git file:///repo --no-update --fail --github-actions
+            git file:///repo --no-update --fail --github-actions             --config /repo/.trufflehog.yml
 
   # -------------------------------------------------------------------
   # 2. Analise de vulnerabilidades em dependencias, SCA (Trivy).
