@@ -207,26 +207,47 @@ jobs:
           output: sarif-results
 
       - name: Bloquear se houver alerta de severidade alta ou critica
+        # No SARIF do CodeQL as regras ficam em tool.extensions (um por pacote
+        # de consultas), e nao em tool.driver. Cada achado aponta para a sua
+        # regra por rule.toolComponent.index e rule.index. Se alguma regra nao
+        # puder ser resolvida, o passo falha em vez de deixar passar.
         run: |
           python3 - <<'PY'
           import glob, json, sys
-          bloqueantes = []
-          total = 0
-          for caminho in glob.glob('sarif-results/*.sarif'):
+          bloqueantes, sem_regra, total = [], [], 0
+          arquivos = glob.glob('sarif-results/*.sarif')
+          if not arquivos:
+              sys.exit('nenhum SARIF encontrado em sarif-results/')
+          for caminho in arquivos:
               run = json.load(open(caminho))['runs'][0]
-              regras = {r['id']: r for r in run['tool']['driver'].get('rules', [])}
+              extensoes = run['tool'].get('extensions', [])
+              por_id = {}
+              for comp in [run['tool']['driver'], *extensoes]:
+                  for regra in comp.get('rules', []):
+                      por_id.setdefault(regra['id'], regra)
               for achado in run.get('results', []):
                   total += 1
-                  props = regras.get(achado['ruleId'], {}).get('properties', {})
-                  nota = float(props.get('security-severity', 0))
+                  ref = achado.get('rule', {})
+                  comp = ref.get('toolComponent', {}).get('index')
+                  idx = ref.get('index')
+                  regra = None
+                  if comp is not None and idx is not None:
+                      regra = extensoes[comp]['rules'][idx]
+                  regra = regra or por_id.get(achado.get('ruleId'))
+                  if regra is None:
+                      sem_regra.append(achado.get('ruleId'))
+                      continue
+                  nota = float(regra.get('properties', {}).get('security-severity', 0))
                   if nota >= 7.0:
                       local = achado['locations'][0]['physicalLocation']
-                      bloqueantes.append((nota, achado['ruleId'],
+                      bloqueantes.append((nota, regra['id'],
                           local['artifactLocation']['uri'],
                           local.get('region', {}).get('startLine')))
           print(f'achados no total: {total}; alta ou critica: {len(bloqueantes)}')
           for nota, regra, arquivo, linha in sorted(bloqueantes, reverse=True):
               print(f'  {nota:>4}  {regra}  {arquivo}:{linha}')
+          if sem_regra:
+              sys.exit(f'regra nao encontrada no SARIF para: {sem_regra}')
           sys.exit(1 if bloqueantes else 0)
           PY
 
