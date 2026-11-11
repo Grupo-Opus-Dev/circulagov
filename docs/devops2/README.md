@@ -1,8 +1,9 @@
 # Devops2: esteira DevSecOps
 
 Documento da atividade Devops2. O relatório técnico completo está em
-[`Relatorio_DevSecOps_CirculaGov.pdf`](Relatorio_DevSecOps_CirculaGov.pdf), e
-os prints de evidência ficam em [`prints/`](prints/).
+[`Relatorio_Devops2.pdf`](Relatorio_Devops2.pdf), e
+os prints de evidência ficam em [`prints/`](prints/). A atividade anterior
+está em [`../devops1/`](../devops1/).
 
 ## O que a esteira faz
 
