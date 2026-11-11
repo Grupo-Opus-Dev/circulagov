@@ -329,8 +329,10 @@ bloqueio foi comprovado no PR #121, que plantou de propósito uma chave, uma
 dependência vulnerável e uma injeção de comando: os quatro jobs ficaram
 vermelhos e o merge ficou bloqueado.
 
-A `main` está configurada para recusar o merge de um Pull Request cuja checagem
-`testes` não esteja verde. Quem é administrador do repositório ainda pode contornar a
+A `main` está configurada para recusar o merge de um Pull Request enquanto qualquer
+uma das oito checagens obrigatórias não estiver verde: `testes`, `dast-zap`,
+`sbom-trivy`, `privacidade-bearer`, `Segredos (TruffleHog)`, `SCA (Trivy)`,
+`SAST (Semgrep)` e `SAST (CodeQL)`. Quem é administrador do repositório ainda pode contornar a
 regra, de propósito e com uma ação explícita, para o caso de emergência. O
 histórico de execuções, com data, hora e log de cada uma, fica em
 https://github.com/Grupo-Opus-Dev/circulagov/actions.
