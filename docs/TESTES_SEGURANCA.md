@@ -319,20 +319,8 @@ descartável, instala as dependências, gera chaves de teste na hora, roda a su�
 valida a configuração de produção com `DEBUG=False` e confere se há migração
 pendente.
 
-Além dos testes, a esteira .github/workflows/devsecops-pipeline.yml roda a
-cada Pull Request e a cada push na main, com quatro verificações de
-segurança: TruffleHog (segredos em todo o histórico do Git, inclusive as
-chaves AES e HMAC do projeto), Trivy (CVE nas dependências), Semgrep e CodeQL
-(análise estática). Qualquer achado de severidade alta ou crítica faz o job
-falhar, e as quatro verificações são obrigatórias para o merge na main. O
-bloqueio foi comprovado no PR #121, que plantou de propósito uma chave, uma
-dependência vulnerável e uma injeção de comando: os quatro jobs ficaram
-vermelhos e o merge ficou bloqueado.
-
-A `main` está configurada para recusar o merge de um Pull Request enquanto qualquer
-uma das oito checagens obrigatórias não estiver verde: `testes`, `dast-zap`,
-`sbom-trivy`, `privacidade-bearer`, `Segredos (TruffleHog)`, `SCA (Trivy)`,
-`SAST (Semgrep)` e `SAST (CodeQL)`. Quem é administrador do repositório ainda pode contornar a
+A `main` está configurada para recusar o merge de um Pull Request cuja checagem
+`testes` não esteja verde. Quem é administrador do repositório ainda pode contornar a
 regra, de propósito e com uma ação explícita, para o caso de emergência. O
 histórico de execuções, com data, hora e log de cada uma, fica em
 https://github.com/Grupo-Opus-Dev/circulagov/actions.
