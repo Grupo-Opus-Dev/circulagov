@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/Grupo-Opus-Dev/circulagov/actions/workflows/testes.yml"><img alt="CI" src="https://github.com/Grupo-Opus-Dev/circulagov/actions/workflows/testes.yml/badge.svg?branch=main" /></a>
+  <a href="https://github.com/Grupo-Opus-Dev/circulagov/actions/workflows/devsecops-pipeline.yml"><img alt="DevSecOps" src="https://github.com/Grupo-Opus-Dev/circulagov/actions/workflows/devsecops-pipeline.yml/badge.svg?branch=main" /></a>
   <a href="https://github.com/Grupo-Opus-Dev/circulagov/releases"><img alt="Release" src="https://img.shields.io/github/v/release/Grupo-Opus-Dev/circulagov?label=release&color=1e3a8a" /></a>
   <a href="https://circulagov.nossoprojeto.app.br"><img alt="Produção" src="https://img.shields.io/badge/produ%C3%A7%C3%A3o-no%20ar-16a34a" /></a>
   <img alt="Disciplina" src="https://img.shields.io/badge/disciplina-Pol%C3%ADticas%20de%20Seguran%C3%A7a%20da%20Informa%C3%A7%C3%A3o-1e3a8a" />
