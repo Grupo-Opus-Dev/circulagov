@@ -126,7 +126,7 @@ class ExcluirDadosViewTests(TestCase):
         Aluno.objects.create(usuario=self.usuario,
                              ra='123456', nome_completo='Aluno Teste')
         self.client.post(reverse('direitos_titular:excluir'))
-        self.assertFalse(Aluno.objects.filter(ra='123456').exists())
+        self.assertFalse(Aluno.objects.com_ra('123456').exists())
 
     def test_excluir_apaga_consentimentos(self):
         Consentimento.objects.create(

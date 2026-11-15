@@ -19,6 +19,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from alunos import protecao as protecao_do_ra
 from recuperacao_senha.models import MINUTOS_VALIDADE_TOKEN
 from recuperacao_senha.views import enviar_email_recuperacao
 
@@ -47,7 +48,8 @@ def lista_usuarios(request):
             Q(username__icontains=busca)
             | Q(email__icontains=busca)
             | Q(aluno__nome_completo__icontains=busca)
-            | Q(aluno__ra__icontains=busca)
+            # O RA fica cifrado no banco: só o RA completo é encontrado.
+            | Q(aluno__ra_indice=protecao_do_ra.indice(busca))
         )
 
     return render(request, 'usuarios/gestao/lista.html', {
