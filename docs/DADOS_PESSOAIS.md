@@ -144,3 +144,27 @@ Nenhum dado além do necessário pra login, recuperação de senha e 2FA
 - **O log de segurança só grava o `username`** de quem gerou o evento
   (login, logout, 2FA, recuperação de senha), nunca senha, código,
   segredo ou token (ver seção 2).
+
+## 4. Política de retenção
+
+Quanto tempo cada dado fica guardado, por quê, e o que acontece no fim. O
+que é apagado automaticamente sai pelo comando `manage.py expurgar`, que o
+`cron` da VPS roda todo dia às 03:30 UTC (`deploy/cron/circulagov.cron`).
+
+| Dado | Onde fica | Por quanto tempo | Por quê | No fim |
+|---|---|---|---|---|
+| Conta: `username`, `email`, nome, hash da senha, datas de acesso | `usuarios_usuario` | Enquanto a conta existir | Sem eles não há login nem recuperação de senha. Base: consentimento de cadastro (LGPD, art. 7º, I) | Apagados na hora quando o titular pede a exclusão ou quando a gestão exclui a conta (`FLUXO_DIREITOS_TITULAR.md`, seção 5) |
+| Aluno: RA (cifrado) e nome completo | `alunos_aluno` | Enquanto a conta existir | Identificar o aluno na rede estadual | Apagados junto com a conta (CASCADE) |
+| Segredo do 2FA e último intervalo de código usado | `dois_fatores_dispositivototp` | Enquanto o 2FA estiver ativo | Gerar e conferir o código | Apagados junto com a conta, ou quando a gestão remove o dispositivo |
+| Consentimentos, inclusive os revogados | `consentimento_consentimento` | Enquanto a conta existir | Provar quando cada consentimento foi dado e revogado: o ônus da prova é do controlador (LGPD, art. 8º, § 2º) | Apagados junto com a conta |
+| Token de recuperação de senha (só o hash) | `recuperacao_senha_tokenrecuperacaosenha` | Vale 30 minutos. Depois de vencido, fica mais 7 dias | Os 7 dias permitem investigar um pedido de recuperação suspeito | Apagado pelo `expurgar` |
+| Contador de tentativas (chave é um hash, sem nome nem endereço em claro) | `usuarios_contadordetentativas` | Até a janela vencer: 15 minutos, ou o tempo do bloqueio | Bloqueio por força bruta | Apagado pelo `expurgar` e pelo próprio login, que limpa os vencidos |
+| Sessão (guarda o id da conta) | `django_session` | 30 minutos sem uso, 12 horas no máximo | Manter o login entre as páginas | Apagada no logout, e as vencidas pelo `expurgar` |
+| Log de segurança: `username` e o evento | `logs/seguranca.log` | Até a rotação, que é feita a cada 6 meses junto com a troca da chave. O arquivo arquivado fica mais 6 meses | Investigar incidentes. Os 6 meses usam como referência o prazo que o Marco Civil da Internet (Lei 12.965/2014, art. 15) fixa para registros de acesso a aplicações | O arquivo arquivado é apagado inteiro, à mão, 6 meses depois da rotação. Linhas não são apagadas uma a uma, porque isso quebraria a cadeia HMAC (`INTEGRIDADE_LOGS.md`) |
+| Âncoras do log | `logs/ancoras.log` e e-mail de integrantes | Junto com o log a que se referem | Detectar o corte do final do log | Saem junto com o log arquivado |
+| Backup | Não existe backup próprio | Não se aplica | O projeto não configura backup do banco nem do log | Se o provedor da VPS fizer backup por conta própria, ele fica fora do controle da aplicação e guarda os dados até ser substituído, no prazo do provedor |
+
+**O que não é automático.** A rotação do log e a remoção do arquivo
+arquivado são manuais, porque dependem de parar o container e trocar a
+chave (`deploy/rotacionar-chave-do-log.sh`). A data da próxima rotação é
+responsabilidade de quem opera o servidor.

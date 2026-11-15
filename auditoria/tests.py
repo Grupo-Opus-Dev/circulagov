@@ -777,6 +777,25 @@ class TesteExpurgoPorRetencao(TestCase):
         self.assertEqual(ContadorDeTentativas.objects.count(), 1)
         self.assertIn('Seriam apagados 1 token(s)', saida.getvalue())
 
+    def test_apaga_sessao_vencida_e_mantem_a_que_vale(self):
+        from datetime import timedelta
+
+        from django.contrib.sessions.models import Session
+        from django.utils import timezone
+
+        Session.objects.create(
+            session_key='vencida', session_data='x',
+            expire_date=timezone.now() - timedelta(minutes=1))
+        Session.objects.create(
+            session_key='valendo', session_data='x',
+            expire_date=timezone.now() + timedelta(minutes=30))
+
+        call_command('expurgar', stdout=StringIO())
+
+        self.assertEqual(
+            list(Session.objects.values_list('session_key', flat=True)),
+            ['valendo'])
+
     def test_dias_configuravel(self):
         self._token('a', expira_ha_dias=3)
 

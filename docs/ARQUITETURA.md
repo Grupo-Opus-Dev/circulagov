@@ -268,4 +268,6 @@ Registrado de propósito, para não dar a entender que o sistema não tem limite
 - o log é arquivo local. A cadeia de HMAC detecta alteração, mas quem tiver
   acesso de escrita ao servidor ainda pode apagar o arquivo inteiro. Proteger
   contra isso exigiria enviar as linhas para fora da máquina.
-- não há rotina de expurgo por tempo de retenção.
+- a rotação do log é manual, a cada 6 meses, junto com a troca da chave. O
+  resto do que vence é apagado todo dia pelo `expurgar` (`DADOS_PESSOAIS.md`,
+  seção 4).

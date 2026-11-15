@@ -50,6 +50,7 @@ Trabalho da disciplina **Políticas de Segurança da Informação**.
 | [docs/TESTES_SEGURANCA.md](docs/TESTES_SEGURANCA.md) | cada ameaça ligada ao teste que a comprova |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | como o sistema foi colocado no ar e como atualizar |
 | [docs/REPRODUCAO.md](docs/REPRODUCAO.md) | comandos para conferir os testes e o TLS de forma independente |
+| [Pôster](docs/POSTER_CIRCULAGOV_FINAL.pdf) e [resumo](docs/Resumo-CirculaGov.pdf) | o trabalho apresentado no formato de evento científico |
 
 ## 🎯 Escopo entregue
 
@@ -78,7 +79,7 @@ existe hoje, veja a [visão geral](docs/VISAO_GERAL.md).
 ├── static/               # CSS do Tailwind e JavaScript próprios, sem CDN
 ├── templates/            # Telas em Django Templates
 ├── usuarios/             # Login, gestão de usuários, bloqueio e admin sobre o login da aplicação
-├── .github/workflows/    # CI: testes no PostgreSQL e conferência do nginx
+├── .github/workflows/    # CI: testes, nginx e as duas esteiras de segurança
 ├── Dockerfile            # Imagem da aplicação
 ├── docker-compose.yml    # Aplicação e banco, portas só em 127.0.0.1
 └── entrypoint.sh         # Migra, coleta os estáticos e sobe o Gunicorn
@@ -127,8 +128,45 @@ Depois da revisão, os contadores de tentativas deixaram o cache em banco do
 Django e foram para uma tabela própria, porque o incremento do cache não é
 atômico e tentativas simultâneas podiam ser contadas a menos. Os testes de cada
 ponto estão em [docs/TESTES_SEGURANCA.md](docs/TESTES_SEGURANCA.md), e o que ainda
-não está resolvido, como o agendamento das âncoras e a obrigatoriedade do 2FA para
-contas de gestão, está em [docs/ANALISE_RISCOS.md](docs/ANALISE_RISCOS.md).
+não está resolvido, como a obrigatoriedade do 2FA para contas de gestão, está em
+[docs/ANALISE_RISCOS.md](docs/ANALISE_RISCOS.md).
+
+## 📝 Respostas ao parecer da v1.5.1 (15/11/2026)
+
+A avaliação da v1.5.1 marcou 11 itens como parciais. O que mudou desde então:
+
+- **RA cifrado em repouso (3.4)**: AES-GCM, com um índice HMAC para busca. A
+  classificação de todos os campos, e por que os demais não são cifrados, está
+  em [ESTRATEGIA_CRIPTOGRAFIA.md](docs/ESTRATEGIA_CRIPTOGRAFIA.md), seção 6.1.
+- **Política de retenção (4.3)**: prazo e destino de cada dado em
+  [DADOS_PESSOAIS.md](docs/DADOS_PESSOAIS.md), seção 4. O comando `expurgar`
+  apaga o que vence, todo dia, pelo `cron` da VPS.
+- **Alcance da exclusão e efeito da revogação (4.10)**: em
+  [FLUXO_DIREITOS_TITULAR.md](docs/FLUXO_DIREITOS_TITULAR.md). Revogar
+  comunicações impede o envio na hora; revogar o cadastro leva à exclusão.
+- **Âncoras fora do servidor e rotação da chave (5.3)**: a âncora sai por e-mail
+  todo dia ([evidência](docs/evidencias/18-evidencia-ancora-agendada-2026-11-15.txt)),
+  e a chave do log tem procedimento de troca testado
+  ([INTEGRIDADE_LOGS.md](docs/INTEGRIDADE_LOGS.md)).
+- **Log injection**: quebra de linha digitada pelo usuário não cria linha falsa
+  no log do console. Fechou os três alertas do CodeQL.
+- **Código do 2FA de uso único**: o mesmo código não vale duas vezes, nem em
+  requisições simultâneas.
+- **Resultados reproduzíveis (6.10)**: 312 testes passando, com commit, ambiente
+  e log público em [REPRODUCAO.md](docs/REPRODUCAO.md).
+
+## 🔁 Esteiras automáticas
+
+Todo Pull Request e todo push na `main` passam por três workflows no GitHub
+Actions, e a `main` só aceita o merge com as oito checagens verdes:
+
+| Workflow | O que faz |
+|---|---|
+| `testes.yml` | roda a suíte de testes num PostgreSQL 17 descartável, confere a configuração de produção (`check --deploy`) e a do nginx |
+| `devsecops-avancado.yml` | ZAP contra o sistema rodando, Bearer nos dados pessoais do código e Trivy na imagem Docker, com SBOM |
+| `devsecops-pipeline.yml` | TruffleHog (segredos em todo o histórico), Trivy nas dependências, Semgrep e CodeQL |
+
+Detalhes nos relatórios em [docs/devops1/](docs/devops1) e [docs/devops2/](docs/devops2).
 
 ## ✅ Onde está cada requisito do checklist
 
@@ -136,7 +174,7 @@ contas de gestão, está em [docs/ANALISE_RISCOS.md](docs/ANALISE_RISCOS.md).
 |---|---|---|
 | 1. Autenticação e credenciais | `usuarios/`, `dois_fatores/` | [FLUXO_AUTENTICACAO.md](docs/FLUXO_AUTENTICACAO.md), [GESTAO_CREDENCIAIS.md](docs/GESTAO_CREDENCIAIS.md), [JUSTIFICATIVAS_TECNICAS.md](docs/JUSTIFICATIVAS_TECNICAS.md) |
 | 2. Recuperação de senha | `recuperacao_senha/` | [FLUXO_RECUPERACAO_SENHA.md](docs/FLUXO_RECUPERACAO_SENHA.md), [EVIDENCIAS_RECUPERACAO_SENHA.md](docs/EVIDENCIAS_RECUPERACAO_SENHA.md) |
-| 3. Criptografia e comunicação | `dois_fatores/cripto.py`, `config/settings.py` | [ESTRATEGIA_CRIPTOGRAFIA.md](docs/ESTRATEGIA_CRIPTOGRAFIA.md), [EVIDENCIA_TLS.md](docs/EVIDENCIA_TLS.md) |
+| 3. Criptografia e comunicação | `dois_fatores/cripto.py`, `alunos/protecao.py`, `config/settings.py` | [ESTRATEGIA_CRIPTOGRAFIA.md](docs/ESTRATEGIA_CRIPTOGRAFIA.md), [EVIDENCIA_TLS.md](docs/EVIDENCIA_TLS.md) |
 | 4. LGPD | `consentimento/`, `direitos_titular/` | [DADOS_PESSOAIS.md](docs/DADOS_PESSOAIS.md), [FLUXO_DIREITOS_TITULAR.md](docs/FLUXO_DIREITOS_TITULAR.md) |
 | 5. Auditoria e logs | `auditoria/` | [INTEGRIDADE_LOGS.md](docs/INTEGRIDADE_LOGS.md), [ANALISE_LOGS.md](docs/ANALISE_LOGS.md), [LOGS_AUTENTICACAO.md](docs/LOGS_AUTENTICACAO.md) |
 | 6. Documentação técnico-científica | `docs/` | [VISAO_GERAL.md](docs/VISAO_GERAL.md), [ARQUITETURA.md](docs/ARQUITETURA.md), [FLUXOS.md](docs/FLUXOS.md), [ANALISE_RISCOS.md](docs/ANALISE_RISCOS.md), [TESTES_SEGURANCA.md](docs/TESTES_SEGURANCA.md), [REFERENCIAS.md](docs/REFERENCIAS.md) |

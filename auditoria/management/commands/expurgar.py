@@ -3,7 +3,8 @@
 Tokens de recuperação de senha: valem 30 minutos e depois não servem para
 nada, mas ficavam na tabela até a conta ser excluída. Contadores de
 tentativas vencidos: já são limpos aos poucos pelo próprio login, e aqui
-saem todos de uma vez.
+saem todos de uma vez. Sessões vencidas: o Django não apaga sozinho, e
+cada uma guarda o id da conta.
 
 O log de segurança fica de fora de propósito. Cada linha é assinada e
 encadeada com a anterior (auditoria/integridade.py): apagar ou reescrever
@@ -15,6 +16,7 @@ import logging
 import time
 from datetime import timedelta
 
+from django.contrib.sessions.models import Session
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -29,8 +31,8 @@ DIAS_DE_RETENCAO_DOS_TOKENS = 7
 
 
 class Command(BaseCommand):
-    help = ('Apaga tokens de recuperação de senha vencidos e contadores de '
-            'tentativas vencidos, conforme a política de retenção.')
+    help = ('Apaga tokens de recuperação de senha, contadores de '
+            'tentativas e sessões vencidos, conforme a política de retenção.')
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -50,22 +52,28 @@ class Command(BaseCommand):
         tokens = TokenRecuperacaoSenha.objects.filter(expira_em__lt=limite)
         contadores = ContadorDeTentativas.objects.filter(
             expira_em__lt=time.time())
+        sessoes = Session.objects.filter(expire_date__lt=timezone.now())
 
         qtd_tokens = tokens.count()
         qtd_contadores = contadores.count()
+        qtd_sessoes = sessoes.count()
 
         if options['dry_run']:
             self.stdout.write(
                 f'Seriam apagados {qtd_tokens} token(s) de recuperação '
-                f'vencidos há mais de {dias} dia(s) e {qtd_contadores} '
-                f'contador(es) de tentativas vencidos. Nada foi apagado.')
+                f'vencidos há mais de {dias} dia(s), {qtd_contadores} '
+                f'contador(es) de tentativas e {qtd_sessoes} sessão(ões) '
+                f'vencidos. Nada foi apagado.')
             return
 
         tokens.delete()
         contadores.delete()
+        sessoes.delete()
         logger.info(
             'expurgo por politica de retencao, tokens=%d, contadores=%d, '
-            'dias=%d', qtd_tokens, qtd_contadores, dias)
+            'sessoes=%d, dias=%d', qtd_tokens, qtd_contadores, qtd_sessoes,
+            dias)
         self.stdout.write(self.style.SUCCESS(
-            f'Apagados {qtd_tokens} token(s) de recuperação e '
-            f'{qtd_contadores} contador(es) de tentativas.'))
+            f'Apagados {qtd_tokens} token(s) de recuperação, '
+            f'{qtd_contadores} contador(es) de tentativas e {qtd_sessoes} '
+            f'sessão(ões) vencidas.'))

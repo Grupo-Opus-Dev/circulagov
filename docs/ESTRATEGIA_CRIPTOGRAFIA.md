@@ -145,6 +145,57 @@ hash nem cifragem, é assinatura: o texto continua legível, e o
 HMAC-SHA256 ao final de cada linha só serve pra provar que ela não foi
 alterada desde que foi gravada.
 
+## 6.1 Classificação dos campos e proteção de cada um
+
+Resposta ao parecer da v1.5.1 (item 3.4), que pediu para dizer quais dados
+pessoais são cifrados em repouso e justificar os demais. Categorias:
+**credencial** (serve para entrar no sistema), **segredo** (gera ou confere
+uma credencial), **identificador** (identifica a pessoa) e **metadado**
+(dado de controle gerado pelo sistema).
+
+| Tabela e campo | Categoria | Proteção em repouso | Por quê |
+|---|---|---|---|
+| `usuarios_usuario.password` | Credencial | Hash Argon2id | Só precisa ser conferida, nunca lida de volta |
+| `dois_fatores_dispositivototp.segredo_cifrado` | Segredo | AES-GCM | O sistema precisa ler de volta para gerar o código |
+| `recuperacao_senha_tokenrecuperacaosenha.token_hash` | Credencial temporária | Hash SHA-256 | Só precisa ser conferido |
+| `alunos_aluno.ra_cifrado` | Identificador | AES-GCM, com índice HMAC-SHA256 (`ra_indice`) para busca | É o identificador oficial do aluno na rede estadual, o dado que mais identifica a pessoa fora do sistema |
+| `alunos_aluno.nome_completo` | Identificador | Acesso restrito ao banco | Ver abaixo |
+| `usuarios_usuario.username` | Identificador | Acesso restrito ao banco | Usado no login: precisa ser buscado pelo valor exato a cada tentativa |
+| `usuarios_usuario.email` | Identificador | Acesso restrito ao banco | Usado para enviar o e-mail de recuperação e conferido na gestão |
+| `usuarios_usuario.first_name`, `last_name` | Identificador | Acesso restrito ao banco | Exibição nas telas |
+| `consentimento_consentimento` (finalidade, versão, datas) | Metadado | Acesso restrito ao banco | Não identifica a pessoa sozinho |
+| `usuarios_usuario` (`is_staff`, `is_active`, `date_joined`, `last_login`), `dois_fatores_dispositivototp.ultimo_passo_usado` | Metadado | Acesso restrito ao banco | Controle de acesso, gerado pelo sistema |
+| `usuarios_contadordetentativas.chave` | Metadado | Hash SHA-256 do nome e do endereço | Contar tentativas sem guardar quem tentou |
+| `logs/seguranca.log` (`username` e evento) | Identificador | HMAC-SHA256 encadeado (integridade, não sigilo) | Precisa ser lido por quem investiga um incidente |
+
+**O que é "acesso restrito ao banco".** O PostgreSQL não publica porta
+nenhuma: só o container da aplicação o alcança, pela rede interna do
+Docker (`docker-compose.yml`). O usuário do banco e a senha ficam no
+`.env` da VPS, fora do repositório. Os dados ficam num volume local da
+VPS, e o tráfego entre o navegador e o servidor é TLS 1.3.
+
+**Por que nome, e-mail e username não são cifrados.** A ASVS 4.0.3
+(V6.1.1) recomenda cifrar em repouso os dados pessoais regulados, e o
+grupo aplicou isso ao RA. Para os demais, a decisão foi aceitar o risco,
+pelos motivos abaixo, e não deixar isso implícito:
+
+- **A chave ficaria no mesmo servidor do banco.** A cifragem na aplicação
+  protege contra quem obtém só o banco ou uma cópia dele (um dump, um
+  volume copiado). Quem controla o servidor lê a chave do `.env` e
+  decifra tudo. Contra esse atacante, cifrar mais campos não muda nada.
+- **Username e e-mail são buscados pelo valor.** O login procura o
+  username exato a cada tentativa, e a gestão busca por parte do nome, do
+  username e do e-mail. Cifrar exigiria um índice para cada campo, como
+  foi feito com o RA, e a busca por parte do texto deixaria de existir.
+- **Nome e e-mail sozinhos identificam menos que o RA.** O RA é o número
+  que a Secretaria da Educação usa para o aluno em todos os sistemas
+  dela. Por isso ele foi o campo escolhido.
+
+O risco que fica é o de um vazamento do banco expor nome, username e
+e-mail. Ele está registrado em `ANALISE_RISCOS.md`. Cifrar o volume do
+banco no disco da VPS reduziria esse risco sem mudar a aplicação, mas
+depende de configuração do servidor e não foi feito.
+
 ## 7. O que decide qual estratégia usar
 
 A regra prática do projeto: se o sistema nunca precisa ler o valor
