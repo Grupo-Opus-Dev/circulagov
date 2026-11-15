@@ -28,6 +28,18 @@ revogação em si é feita pelo método `Consentimento.revogar()`
 Um consentimento revogado pode ser aceito novamente depois, criando um
 novo registro e preservando o histórico do anterior.
 
+**Efeito da revogação em cada finalidade.** Revogar não só registra a
+data, também muda o que o sistema faz:
+
+| Finalidade | O que acontece ao revogar | O que fica guardado |
+|---|---|---|
+| Comunicações por e-mail sobre empréstimos | Revoga na hora. Todo envio dessa finalidade passa por `enviar_comunicacao` (`consentimento/comunicacoes.py`), que confere o consentimento no momento do envio, então nada mais é enviado | O registro do consentimento, com `aceito_em` e `revogado_em`, como prova de quando valeu (LGPD, art. 8º, § 2º) |
+| Cadastro e autenticação | Sem esses dados não há como manter a conta, porque login, 2FA e recuperação de senha dependem deles. Revogar o cadastro é pedir a exclusão: a pessoa vai para a tela de confirmação da exclusão, e nada muda sem ela confirmar | Nada, se ela confirmar: a conta e tudo ligado a ela são apagados (seção 5) |
+
+O e-mail de recuperação de senha não depende do consentimento de
+comunicações: faz parte do cadastro e é o próprio titular quem o pede.
+Testes em `consentimento/tests.py` (`EfeitoDaRevogacaoTests`).
+
 ### 2. Registro de data e versão do consentimento (requisito 4.7)
 
 Todo consentimento guarda automaticamente o momento em que foi aceito

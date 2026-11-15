@@ -44,13 +44,33 @@ def gerenciar(request):
 
 @login_required
 def revogar(request, consentimento_id):
-    """Requisito 4.6: usuário revoga um consentimento próprio."""
+    """Requisito 4.6: usuário revoga um consentimento próprio.
+
+    O efeito depende da finalidade:
+    - Comunicações: revoga na hora, e nenhum envio novo acontece
+      (consentimento/comunicacoes.py).
+    - Cadastro: sem ele não há como manter a conta, porque login, 2FA e
+      recuperação de senha dependem desses dados. Revogar o cadastro é
+      pedir a exclusão, então a pessoa vai para a confirmação da exclusão
+      e nada é revogado sem ela confirmar.
+    """
     if request.method != 'POST':
         return redirect('consentimento:gerenciar')
 
     consentimento = get_object_or_404(
         Consentimento, id=consentimento_id, usuario=request.user
     )
+
+    if consentimento.finalidade == Finalidade.CADASTRO:
+        messages.info(
+            request,
+            'O consentimento de cadastro é o que mantém a sua conta. Para '
+            'revogá-lo, confirme a exclusão da conta e dos seus dados.')
+        return redirect('direitos_titular:confirmar_exclusao')
+
     consentimento.revogar()
-    messages.success(request, 'Consentimento revogado.')
+    messages.success(
+        request,
+        'Consentimento revogado. Você não receberá mais comunicações por '
+        'e-mail sobre empréstimos.')
     return redirect('consentimento:gerenciar')
