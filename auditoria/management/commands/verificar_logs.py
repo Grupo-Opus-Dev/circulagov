@@ -1,8 +1,10 @@
+import sys
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
 from auditoria.ancoras import verificar_com_ancoras
+from auditoria.integridade import decodificar_chave
 
 
 class Command(BaseCommand):
@@ -12,11 +14,41 @@ class Command(BaseCommand):
         parser.add_argument(
             '--ancoras', action='append', default=[], metavar='ARQUIVO',
             help='Arquivo com âncoras guardadas fora do servidor (pode '
-                 'repetir). As de logs/ancoras.log sempre entram.')
+                 'repetir). As de logs/ancoras.log entram sempre que o '
+                 'arquivo verificado é o log atual.')
+        parser.add_argument(
+            '--arquivo', metavar='ARQUIVO',
+            help='Verifica este arquivo em vez do log atual, por exemplo um '
+                 'log arquivado na rotação da chave.')
+        parser.add_argument(
+            '--chave-arquivo', metavar='ARQUIVO',
+            help='Arquivo com a chave (base64) que assinou o log, quando ela '
+                 'não é a atual. Com "-", lê da entrada padrão. A chave '
+                 'não vai na linha de comando para não aparecer na lista '
+                 'de processos nem no histórico.')
 
     def handle(self, *args, **options):
+        chave = None
+        if options['chave_arquivo']:
+            try:
+                if options['chave_arquivo'] == '-':
+                    chave = sys.stdin.read().strip()
+                else:
+                    chave = Path(options['chave_arquivo']).read_text(
+                        encoding='utf-8').strip()
+                decodificar_chave(chave)
+            except (OSError, ValueError) as erro:
+                raise CommandError(f'Chave inválida: {erro}')
+
+        caminho_do_log = None
+        if options['arquivo']:
+            caminho_do_log = Path(options['arquivo'])
+            if not caminho_do_log.exists():
+                raise CommandError(f'Arquivo não encontrado: {caminho_do_log}')
+
         resultado = verificar_com_ancoras(
-            [Path(caminho) for caminho in options['ancoras']])
+            [Path(caminho) for caminho in options['ancoras']],
+            caminho_do_log=caminho_do_log, chave=chave)
 
         if not resultado.integro:
             # CommandError faz o comando terminar com código de erro, útil
