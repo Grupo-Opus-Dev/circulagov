@@ -9,6 +9,14 @@
     poderão ser recuperados.
   </p>
 
+  {% if messages %}
+    {% for mensagem in messages %}
+      <div class="mb-4 rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+        {{ mensagem }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
   <div class="mb-6 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
     Tem certeza que deseja excluir permanentemente sua conta e seus dados?
   </div>

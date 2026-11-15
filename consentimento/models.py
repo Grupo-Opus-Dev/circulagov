@@ -65,3 +65,12 @@ class Consentimento(models.Model):
         além da que ele for construir."""
         self.revogado_em = timezone.now()
         self.save(update_fields=['revogado_em'])
+
+
+def tem_consentimento(usuario, finalidade):
+    """Diz se o usuário tem consentimento ativo para a finalidade. Todo
+    tratamento opcional pergunta aqui antes de acontecer, para a
+    revogação ter efeito na hora (requisito 4.6)."""
+    return Consentimento.objects.filter(
+        usuario=usuario, finalidade=finalidade, revogado_em__isnull=True,
+    ).exists()

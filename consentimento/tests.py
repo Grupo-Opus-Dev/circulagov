@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 from django.urls import reverse
@@ -108,7 +109,7 @@ class GerenciarConsentimentoViewTests(TestCase):
 
     def test_revogar_marca_consentimento_como_inativo(self):
         c = Consentimento.objects.create(
-            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+            usuario=self.usuario, finalidade=Finalidade.COMUNICACOES)
         self.client.post(reverse('consentimento:revogar', args=[c.id]))
         c.refresh_from_db()
         self.assertFalse(c.ativo)
@@ -138,3 +139,94 @@ class GerenciarConsentimentoViewTests(TestCase):
         self.client.get(reverse('consentimento:revogar', args=[c.id]))
         c.refresh_from_db()
         self.assertTrue(c.ativo)
+
+
+class EfeitoDaRevogacaoTests(TestCase):
+    """Parecer da v1.5.1, item 4: a revogação precisa ter efeito sobre
+    cada finalidade, e não só registrar a data."""
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='titular', password='Senha@123',
+            email='titular@escola.test')
+        self.client.force_login(self.usuario)
+
+    def test_revogar_cadastro_leva_para_a_confirmacao_da_exclusao(self):
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+
+        resposta = self.client.post(
+            reverse('consentimento:revogar', args=[c.id]), follow=True)
+
+        self.assertRedirects(
+            resposta, reverse('direitos_titular:confirmar_exclusao'))
+        self.assertContains(resposta, 'confirme a exclusão da conta')
+
+    def test_revogar_cadastro_sem_confirmar_nao_revoga_nem_exclui(self):
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+
+        self.client.post(reverse('consentimento:revogar', args=[c.id]))
+
+        c.refresh_from_db()
+        self.assertTrue(c.ativo)
+        self.assertTrue(Usuario.objects.filter(pk=self.usuario.pk).exists())
+
+    def test_confirmar_a_exclusao_apaga_conta_e_consentimentos(self):
+        Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.CADASTRO)
+
+        self.client.post(reverse('direitos_titular:excluir'))
+
+        self.assertFalse(Usuario.objects.filter(pk=self.usuario.pk).exists())
+        self.assertFalse(Consentimento.objects.exists())
+
+    def test_com_consentimento_a_comunicacao_e_enviada(self):
+        from .comunicacoes import enviar_comunicacao
+
+        Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.COMUNICACOES)
+
+        self.assertTrue(enviar_comunicacao(self.usuario, 'Aviso', 'Texto'))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['titular@escola.test'])
+
+    def test_sem_consentimento_a_comunicacao_nao_e_enviada(self):
+        from .comunicacoes import enviar_comunicacao
+
+        self.assertFalse(enviar_comunicacao(self.usuario, 'Aviso', 'Texto'))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_depois_de_revogar_comunicacoes_nada_mais_e_enviado(self):
+        from .comunicacoes import enviar_comunicacao
+
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.COMUNICACOES)
+        self.assertTrue(enviar_comunicacao(self.usuario, 'Antes', 'Texto'))
+
+        self.client.post(reverse('consentimento:revogar', args=[c.id]))
+
+        self.assertFalse(enviar_comunicacao(self.usuario, 'Depois', 'Texto'))
+        self.assertEqual([m.subject for m in mail.outbox], ['Antes'])
+
+    def test_reaceitar_comunicacoes_volta_a_permitir_o_envio(self):
+        from .comunicacoes import enviar_comunicacao
+
+        c = Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.COMUNICACOES)
+        c.revogar()
+        self.client.post(
+            reverse('consentimento:gerenciar'),
+            {'finalidade': Finalidade.COMUNICACOES})
+
+        self.assertTrue(enviar_comunicacao(self.usuario, 'De novo', 'Texto'))
+
+    def test_comunicacao_sem_email_cadastrado_nao_e_enviada(self):
+        from .comunicacoes import enviar_comunicacao
+
+        self.usuario.email = ''
+        self.usuario.save()
+        Consentimento.objects.create(
+            usuario=self.usuario, finalidade=Finalidade.COMUNICACOES)
+
+        self.assertFalse(enviar_comunicacao(self.usuario, 'Aviso', 'Texto'))
