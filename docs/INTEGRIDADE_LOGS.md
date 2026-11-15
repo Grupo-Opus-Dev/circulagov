@@ -124,6 +124,41 @@ verificadas"; depois, "Log alterado na linha 5".
 | Reiniciar o servidor | A cadeia continua de onde o arquivo parou |
 | Vários processos gravando ao mesmo tempo (workers do Gunicorn) | A cadeia se mantém, nenhuma linha se perde |
 
+## Rotação da chave
+
+Trocar a chave limita o estrago de um vazamento: quem obtiver uma chave
+antiga só consegue forjar o trecho do log que ela assinou. A troca é feita
+na VPS, na pasta do projeto, com:
+
+```bash
+ANCORA_EMAIL=alguem@exemplo.com ./deploy/rotacionar-chave-do-log.sh
+```
+
+O script segue esta ordem:
+
+1. para o container `web`, para nada ser gravado durante a troca;
+2. roda `manage.py arquivar_log`, que confere o log com a chave atual,
+   emite uma âncora de fechamento (enviada por e-mail se `ANCORA_EMAIL`
+   estiver definido) e renomeia `seguranca.log` e `ancoras.log` para
+   `seguranca-AAAAMMDD-HHMMSS.log` e `ancoras-AAAAMMDD-HHMMSS.log`. Se o
+   log não estiver íntegro, nada é arquivado e o `web` volta a subir;
+3. guarda a chave antiga em `~/circulagov-chaves-antigas/`, fora do
+   projeto e legível só pelo dono, porque ela é necessária para auditar
+   o log arquivado;
+4. troca `CHAVE_INTEGRIDADE_LOGS` no `.env` por uma chave nova;
+5. sobe o `web` de novo, que começa uma cadeia nova com a chave nova.
+
+Para auditar um log arquivado, a chave antiga entra pela entrada padrão,
+para não aparecer na lista de processos nem no histórico do shell:
+
+```bash
+docker compose exec -T web python manage.py verificar_logs     --arquivo logs/seguranca-20261115-120000.log     --ancoras logs/ancoras-20261115-120000.log --chave-arquivo -     < ~/circulagov-chaves-antigas/chave-log-20261115-120000.txt
+```
+
+A âncora de fechamento registra o tamanho final do arquivo, então cortar
+o fim do log arquivado depois da rotação também é detectado. Testes em
+`auditoria/tests_rotacao.py`.
+
 ## Limites da proteção
 
 Nenhuma proteção de log é absoluta. Os limites conhecidos são:
