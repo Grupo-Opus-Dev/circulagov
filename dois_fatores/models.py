@@ -1,8 +1,11 @@
+import hmac
 import logging
 
 import pyotp
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
+from django.utils import timezone
 
 from . import cripto
 
@@ -24,6 +27,9 @@ class DispositivoTOTP(models.Model):
     segredo_cifrado = models.BinaryField()
     confirmado = models.BooleanField(default=False)
     criado_em = models.DateTimeField(auto_now_add=True)
+    # Intervalo de 30 s do último código aceito. Um código só vale uma vez:
+    # quem o interceptar não consegue reutilizá-lo dentro da janela.
+    ultimo_passo_usado = models.BigIntegerField(null=True, blank=True)
 
     def __str__(self):
         return f'2FA de {self.usuario}'
@@ -49,11 +55,36 @@ class DispositivoTOTP(models.Model):
         # cadastro do 2FA quanto o login passam por esse método, então um
         # log só nesse lugar já cobre os dois casos sem repetir código.
         # O código digitado nunca entra na mensagem, só o resultado.
-        gerador = self.totp()
-        codigo_certo = gerador.verify(codigo, valid_window=1)
         username = self.usuario.get_username()
-        if codigo_certo:
-            logger.info('codigo 2FA correto, username=%s', username)
-        else:
+        passo = self._passo_do_codigo(codigo)
+        if passo is None:
             logger.warning('codigo 2FA incorreto, username=%s', username)
-        return codigo_certo
+            return False
+
+        # Uso único (RFC 6238, seção 5.2). O UPDATE só acontece se o passo
+        # for mais novo que o último aceito, e o banco faz isso numa
+        # operação só: duas requisições simultâneas com o mesmo código não
+        # passam as duas.
+        aceitos = DispositivoTOTP.objects.filter(
+            Q(ultimo_passo_usado__isnull=True) | Q(ultimo_passo_usado__lt=passo),
+            pk=self.pk,
+        ).update(ultimo_passo_usado=passo)
+        if not aceitos:
+            logger.warning('codigo 2FA ja usado, username=%s', username)
+            return False
+
+        self.ultimo_passo_usado = passo
+        logger.info('codigo 2FA correto, username=%s', username)
+        return True
+
+    def _passo_do_codigo(self, codigo):
+        """Intervalo de 30 s a que o código pertence, aceitando um antes e
+        um depois do atual para tolerar relógio dessincronizado. None se o
+        código não bate com nenhum."""
+        codigo = str(codigo or '')
+        gerador = self.totp()
+        atual = gerador.timecode(timezone.now())
+        for passo in (atual - 1, atual, atual + 1):
+            if hmac.compare_digest(gerador.generate_otp(passo), codigo):
+                return passo
+        return None

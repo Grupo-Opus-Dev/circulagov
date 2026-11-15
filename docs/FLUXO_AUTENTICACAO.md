@@ -77,9 +77,18 @@ Authy, etc.).
 A view `verificar`, em `dois_fatores/views.py`, usa a biblioteca
 `pyotp` para gerar o código esperado naquele momento a partir do
 segredo salvo no banco, e compara com o que o usuário digitou
-(com uma pequena margem de tolerância de tempo, `valid_window=1`).
+(com uma pequena margem de tolerância de tempo: aceita o código do
+intervalo de 30 segundos atual, do anterior e do seguinte).
 
-- **Código incorreto:** mensagem de erro, o usuário continua na tela
+Cada código vale uma vez só (RFC 6238, seção 5.2). O dispositivo guarda
+o intervalo do último código aceito (`ultimo_passo_usado`), e um código
+do mesmo intervalo ou de um mais antigo é recusado, com o evento
+`codigo 2FA ja usado` no log. A gravação é um UPDATE condicional no
+banco, então duas requisições simultâneas com o mesmo código não passam
+as duas. Testes em `dois_fatores/tests.py` (`TesteCodigoDeUsoUnico` e
+`TesteCodigoDeUsoUnicoEmParalelo`).
+
+- **Código incorreto ou já usado:** mensagem de erro, o usuário continua na tela
   de verificação (ainda não está logado).
 - **Código correto:** só agora o sistema chama `login()` de verdade,
   remove a marca temporária da sessão, e o usuário é enviado para a
