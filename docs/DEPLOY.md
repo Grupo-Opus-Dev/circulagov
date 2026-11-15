@@ -321,8 +321,44 @@ docker compose exec web python manage.py verificar_logs --ancoras /tmp/ancoras.t
 ```
 
 A frequência define a janela cega: o que for apagado depois da última âncora
-não é detectado. Emitir uma por dia, por exemplo com o `cron` do servidor,
-reduz essa janela a um dia. Isso ainda não está agendado.
+não é detectado. Por isso a emissão é diária, pelo `cron` (próxima seção).
+
+## Tarefas agendadas
+
+O arquivo `deploy/cron/circulagov.cron` agenda duas tarefas, ambas pelo
+script `deploy/tarefas-agendadas.sh`:
+
+| Horário (UTC) | Tarefa | O que faz |
+|---|---|---|
+| 03:00, todo dia | `ancora` | emite uma âncora do log e envia por e-mail para `ANCORA_EMAIL` |
+| 03:30, todo dia | `expurgo` | apaga tokens de recuperação vencidos há mais de 7 dias e contadores vencidos |
+
+Os destinatários da âncora ficam no `.env` da VPS, e não no repositório, que é
+público. Mais de um endereço vai separado por vírgula:
+
+```bash
+ANCORA_EMAIL=integrante1@exemplo.com,integrante2@exemplo.com
+```
+
+O envio usa o SMTP do `.env` (`EMAIL_BACKEND`, `EMAIL_HOST` e os demais). Sem
+SMTP configurado, o Django usa o backend de console, e a âncora só aparece no
+`~/circulagov-cron.log`, sem sair do servidor.
+
+Para instalar, somando ao crontab que já existir (a VPS roda outros sistemas):
+
+```bash
+cd ~/apps/circulagov
+(crontab -l 2>/dev/null; cat deploy/cron/circulagov.cron) | crontab -
+crontab -l
+```
+
+Para testar na hora, sem esperar o horário:
+
+```bash
+./deploy/tarefas-agendadas.sh ancora
+./deploy/tarefas-agendadas.sh expurgo
+tail ~/circulagov-cron.log
+```
 
 ## Se a cadeia do log quebrar
 
@@ -354,5 +390,6 @@ mesmo sem integridade verificável.
 ## Limitações conhecidas
 
 - não há backup automático do banco nem do log, só os volumes locais
-- não há rotação do arquivo de log
+- a rotação do arquivo de log é manual, junto com a troca da chave
+  (`INTEGRIDADE_LOGS.md`, seção "Rotação da chave")
 - o deploy é manual, sem integração contínua

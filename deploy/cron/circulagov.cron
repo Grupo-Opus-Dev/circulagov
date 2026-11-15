@@ -1,0 +1,8 @@
+# Tarefas agendadas do CirculaGov. Horários em UTC (meia-noite em Brasília).
+# Instalação e conferência: docs/DEPLOY.md, seção "Tarefas agendadas".
+#
+# Âncora do log todo dia: o que for apagado do fim do log depois da última
+# âncora não é detectado, então a janela cega fica em no máximo um dia.
+0 3 * * * $HOME/apps/circulagov/deploy/tarefas-agendadas.sh ancora >> $HOME/circulagov-cron.log 2>&1
+# Expurgo dos dados vencidos, logo depois.
+30 3 * * * $HOME/apps/circulagov/deploy/tarefas-agendadas.sh expurgo >> $HOME/circulagov-cron.log 2>&1
