@@ -79,7 +79,9 @@ def novo_usuario(request):
             com_link = not criado.has_usable_password()
             logger.info(
                 'usuario criado, username=%s, is_staff=%s, senha=%s, criado_por=%s',
-                para_log(criado.get_username()), criado.is_staff,
+                para_log(criado.get_username()),
+                # Texto fixo, e não o valor do formulário, no log.
+                'True' if criado.is_staff else 'False',
                 'por_link' if com_link else 'definida_pelo_gestor',
                 para_log(request.user.get_username()),
             )
