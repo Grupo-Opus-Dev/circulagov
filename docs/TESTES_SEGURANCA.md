@@ -311,6 +311,23 @@ O `check --deploy` confere que as configurações estão presentes, não que o
 servidor de produção está respondendo com TLS. Esta segunda parte só a evidência
 manual comprova.
 
+## 18. Respostas ao parecer da v1.5.1
+
+Testes que entraram depois da avaliação da v1.5.1, cada grupo ligado ao
+item do parecer que ele responde.
+
+| Classe de teste | Arquivo | Item | O que prova |
+|---|---|---|---|
+| `TesteRACifradoEmRepouso` | `alunos/tests.py` | 3.4 | O RA não aparece em texto puro na tabela nem no `dumpdata`, a busca pelo RA completo e a unicidade continuam funcionando, e o valor cifrado não decifra em outro contexto |
+| `TesteMigracaoQueCifraORA` | `alunos/tests.py` | 3.4 | A migração cifra o RA de quem já estava cadastrado, e a volta devolve o texto original |
+| `TesteFormularioDoAdmin` | `alunos/tests.py` | 3.4 | O admin grava o RA cifrado e recusa RA repetido |
+| `TesteExpurgoPorRetencao` | `auditoria/tests.py` | 4.3 | O `expurgar` apaga só tokens, contadores e sessões vencidos, respeita o `--dry-run` e registra o expurgo no log |
+| `EfeitoDaRevogacaoTests` | `consentimento/tests.py` | 4.6 e 4.10 | Revogar comunicações impede o envio na hora; revogar o cadastro leva à confirmação da exclusão e nada muda sem ela |
+| `RotacaoDaChaveDoLogTests` | `auditoria/tests_rotacao.py` | 5.3 | O log arquivado continua verificável com a chave antiga, o corte do seu final é detectado e um log adulterado não é arquivado |
+| `ParaLogTests`, `FiltroDoConsoleTests`, `CampoDoUsuarioNoLogTests` | `auditoria/tests_log_seguro.py` | 5.1 e 5.3 | Uma quebra de linha digitada no campo de usuário não cria linha falsa no log do console (log injection) |
+| `TesteCodigoDeUsoUnico` | `dois_fatores/tests.py` | 1.5 e 1.6 | O mesmo código do 2FA não vale duas vezes, nem um código mais antigo que o último aceito |
+| `TesteCodigoDeUsoUnicoEmParalelo` | `dois_fatores/tests.py` | 1.5 e 1.6 | Cinco tentativas simultâneas com o mesmo código: só uma passa |
+
 ## Execução contínua
 
 Os testes rodam sozinhos no GitHub Actions, em `.github/workflows/testes.yml`,
@@ -334,12 +351,13 @@ python manage.py test
 ## Resultados da execução
 
 O registro abaixo é de uma execução datada (24/09/2026, 109 testes). Desde
-então a suíte cresceu. Na última execução na `main` (04/10/2026) ela tem
-**259 testes, todos passando e nenhum pulado**
-([execução na CI](https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/37233792911),
-`Ran 259 tests in 25.256s`, `OK`), e a contagem era a mesma em 16/10/2026. A
-execução mais recente, com resultado e log, está sempre na aba Actions do
-repositório.
+então a suíte cresceu. Na v1.5.1 (16/10/2026) eram **259 testes**. Na `main`
+de 15/11/2026, depois das respostas ao parecer, são **312 testes, todos
+passando e nenhum pulado**
+([execução na CI](https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/43772706508),
+`Ran 312 tests in 23.029s`, `OK`). As execuções de cada versão, com commit e
+ambiente, estão em [`REPRODUCAO.md`](REPRODUCAO.md). A execução mais recente
+está sempre na aba Actions do repositório.
 
 Execução real em **24/09/2026**, com **Python 3.13.15** e **Django
 5.2.17**.

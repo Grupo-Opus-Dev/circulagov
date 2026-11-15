@@ -331,7 +331,7 @@ script `deploy/tarefas-agendadas.sh`:
 | Horário (UTC) | Tarefa | O que faz |
 |---|---|---|
 | 03:00, todo dia | `ancora` | emite uma âncora do log e envia por e-mail para `ANCORA_EMAIL` |
-| 03:30, todo dia | `expurgo` | apaga tokens de recuperação vencidos há mais de 7 dias e contadores vencidos |
+| 03:30, todo dia | `expurgo` | apaga tokens de recuperação vencidos há mais de 7 dias, contadores e sessões vencidos |
 
 Os destinatários da âncora ficam no `.env` da VPS, e não no repositório, que é
 público. Mais de um endereço vai separado por vírgula:
@@ -392,7 +392,8 @@ mesmo sem integridade verificável.
 
 ## Limitações conhecidas
 
-- não há backup automático do banco nem do log, só os volumes locais
+- não há backup próprio do banco nem do log, só os volumes locais. Backup que o
+  provedor da VPS faça por conta própria fica fora do controle da aplicação
 - a rotação do arquivo de log é manual, junto com a troca da chave
   (`INTEGRIDADE_LOGS.md`, seção "Rotação da chave")
 - o deploy é manual, sem integração contínua

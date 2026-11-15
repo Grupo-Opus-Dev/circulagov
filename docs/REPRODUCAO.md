@@ -15,19 +15,24 @@ As execuções do CI ficam públicas, com data, commit, versões e log completo.
 |---|---|---|---|
 | v1.5.1 (avaliada) | `699a3b3` | `Ran 259 tests in 25.168s`, `OK` | [39148489567](https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/39148489567) |
 | `main` depois do PR #117 | `1607149` | `Ran 263 tests in 28.609s`, `OK` | [41846776603](https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/41846776603) |
+| `main` depois do PR #137 | `56d59f0` | `Ran 312 tests in 23.029s`, `OK` | [43772706508](https://github.com/Grupo-Opus-Dev/circulagov/actions/runs/43772706508) |
 
-Os 4 testes a mais da `main` são os do byte nulo na recuperação de senha e na
-busca da gestão, trazidos pelo PR #117.
+Os 4 testes a mais da segunda linha são os do byte nulo na recuperação de
+senha e na busca da gestão, trazidos pelo PR #117. Os 49 a mais da terceira
+vieram das respostas ao parecer da v1.5.1: RA cifrado, expurgo, rotação da
+chave do log, efeito da revogação, log injection e código do 2FA de uso
+único (PRs #130 a #137, lista em `TESTES_SEGURANCA.md`).
 
 Ambiente das execuções acima, conforme o próprio log:
 
 - Ubuntu 24.04 (runner do GitHub);
-- CPython 3.13.16 na v1.5.1 e 3.13.17 na `main`;
+- CPython 3.13.16 na v1.5.1, 3.13.17 depois do PR #117 e 3.13.18 depois do PR #137;
 - Django 5.2.17 e as demais dependências fixadas em `requirements.txt`;
 - PostgreSQL 17 (imagem oficial `postgres:17`), descartável, criado para a execução;
 - chaves de criptografia geradas na hora, só para o teste.
 
-No log, procure as linhas `Found 259 test(s).` e `Ran 259 tests`, no passo
+No log, procure as linhas `Found N test(s).` e `Ran N tests`, com o número da
+tabela, no passo
 "Rodar os testes" do job `testes`.
 
 ### Rodando na própria máquina
@@ -57,12 +62,14 @@ python manage.py test --no-input
 Saída esperada no fim:
 
 ```
-Ran 259 tests in ...s
+Ran 313 tests in ...s
 
 OK
 ```
 
-Na `main` atual, o número é 263. O tempo varia com a máquina.
+São 313 na `main` atual: os 312 da última linha da tabela mais o teste de
+expurgo de sessões vencidas. Na v1.5.1 eram 259. O tempo varia com a
+máquina.
 
 ### O que os testes provam e o que não provam
 

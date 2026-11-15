@@ -158,7 +158,9 @@ Registradas aqui para não dar a impressão de que passaram despercebidas:
 
 - não há tela para desativar o 2FA depois de ativado. Quem perder o app
   autenticador precisa que alguém remova o dispositivo pelo `/admin/`
-- não há rotina de expurgo por tempo de retenção
+- a rotação do log é manual, a cada 6 meses, junto com a troca da chave. O
+  resto do que vence é apagado todo dia pelo `expurgar` (`DADOS_PESSOAIS.md`,
+  seção 4)
 - o bloqueio por força bruta é por nome de usuário, não por endereço de origem,
   pelo motivo explicado em [JUSTIFICATIVAS_TECNICAS.md](JUSTIFICATIVAS_TECNICAS.md)
 - o log fica em arquivo no servidor: a cadeia de HMAC detecta alteração, mas

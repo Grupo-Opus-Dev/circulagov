@@ -179,8 +179,9 @@ Além das ameaças já consideradas pelo projeto, outras ameaças podem ser iden
 Lacunas conhecidas hoje:
 
 - o limite de requisições por endereço não barra um ataque distribuído por muitos endereços
-- não há backup do banco nem do log de segurança
-- a emissão de âncoras do log não está agendada, e a cópia fora do servidor depende de alguém guardar as mensagens (ameaça 17)
+- não há backup próprio do banco nem do log de segurança (ver `DADOS_PESSOAIS.md`, seção 4)
+- a âncora do log sai todo dia por e-mail para integrantes do grupo. Uma cópia num serviço onde a aplicação só consegue escrever seria mais forte (ameaça 17)
+- nome, username e e-mail não são cifrados em repouso: um vazamento do banco os expõe. Só o RA, o segredo do 2FA e as credenciais são protegidos (ver `ESTRATEGIA_CRIPTOGRAFIA.md`, seção 6.1)
 
 ## 6.8 Risco x Contramedida
 

@@ -80,6 +80,30 @@ seus relacionamentos com `Usuario`, o próprio banco de dados apaga
 automaticamente todos os registros relacionados, sem necessidade de
 apagar cada tabela manualmente.
 
+#### Alcance da exclusão
+
+O que some na hora e o que sobra depois que a conta é excluída:
+
+| Onde | O que acontece |
+|---|---|
+| Conta (`usuarios_usuario`) | Apagada |
+| Aluno, com o RA cifrado | Apagado (CASCADE) |
+| Consentimentos, ativos e revogados | Apagados (CASCADE) |
+| Dispositivo do 2FA | Apagado (CASCADE) |
+| Tokens de recuperação de senha | Apagados (CASCADE) |
+| Sessão atual | Encerrada pelo `logout` antes da exclusão. Outra sessão aberta em outro aparelho deixa de valer, porque a conta não existe mais, e é apagada pelo `expurgar` quando vence |
+| Contadores de tentativas | Não guardam o nome em claro (a chave é um hash) e somem quando a janela vence |
+| Log de segurança | **Fica.** As linhas com o `username` continuam no arquivo até a rotação e o prazo do arquivo arquivado (`DADOS_PESSOAIS.md`, seção 4). Elas não são apagadas nem reescritas, porque cada linha é encadeada com a anterior: mudar uma quebraria a cadeia, e é exatamente isso que a verificação de integridade existe para acusar |
+| Backup | O projeto não tem backup próprio, então não há cópia da aplicação para apagar. Backup que o provedor da VPS faça por conta própria fica fora do controle da aplicação e guarda os dados até ser substituído |
+| E-mails já enviados | O e-mail de recuperação de senha já entregue fica na caixa da própria pessoa. As âncoras enviadas aos integrantes não têm dado pessoal |
+
+Ou seja, a exclusão é completa no banco e imediata. O que permanece é o
+`username` no log, por um prazo definido e por um motivo legítimo:
+investigar incidentes de segurança, que a LGPD exige do controlador
+(art. 46). O prazo de 6 meses usa como referência o que o Marco Civil da
+Internet (Lei 12.965/2014, art. 15) fixa para registros de acesso a
+aplicações.
+
 ## Por que a exclusão exige uma tela de confirmação separada
 
 Diferente das outras ações (que respondem a um clique único), a

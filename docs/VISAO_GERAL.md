@@ -229,6 +229,8 @@ python manage.py verificar_logs
 - o log é arquivo local: a cadeia de HMAC detecta alteração, mas quem tiver
   acesso de escrita ao servidor ainda pode apagar o arquivo inteiro. As âncoras
   (`emitir_ancora`) detectam isso, mas só se uma cópia delas estiver fora do
-  servidor, e a emissão periódica ainda não está agendada
-- não há rotina de expurgo por tempo de retenção
+  servidor. Elas são emitidas todo dia e enviadas por e-mail pelo `cron`
+- a rotação do log é manual, a cada 6 meses, junto com a troca da chave. O
+  resto do que vence é apagado todo dia pelo `expurgar` (`DADOS_PESSOAIS.md`,
+  seção 4)
 - o bloqueio por força bruta é por usuário e endereço, com teto de 25 falhas por conta; um atacante com muitos endereços ainda pode manter esse teto atingido e trancar a conta da vítima por 15 minutos

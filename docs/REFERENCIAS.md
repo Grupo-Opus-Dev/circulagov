@@ -387,6 +387,26 @@ UNIVERSIDADE FEDERAL DE SANTA CATARINA. Biblioteca Universitária.
 Florianópolis: UFSC, 2019. Disponível em:
 https://repositorio.ufsc.br/handle/123456789/194316. Acesso em: 24 set. 2026.
 
+### Fontes citadas em outros documentos
+
+Estas duas entradas não são discutidas no corpo deste documento. Elas
+sustentam decisões registradas em outros arquivos de `docs/`.
+
+BRASIL. **Lei nº 12.965, de 23 de abril de 2014**. Estabelece princípios,
+garantias, direitos e deveres para o uso da Internet no Brasil. Brasília, DF:
+Presidência da República, 2014. Disponível em:
+https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2014/lei/l12965.htm.
+Acesso em: 15 nov. 2026.
+
+OWASP. **Application security verification standard 4.0.3**. [S. l.]: OWASP
+Foundation, out. 2021. Disponível em: https://github.com/OWASP/ASVS/tree/v4.0.3.
+Acesso em: 15 nov. 2026.
+
+| Fonte | Onde é citada | Para quê |
+|---|---|---|
+| BRASIL (Lei 12.965/2014), art. 15 | `DADOS_PESSOAIS.md`, seção 4, e `FLUXO_DIREITOS_TITULAR.md`, seção 5 | Referência para o prazo de 6 meses do log de segurança |
+| OWASP ASVS 4.0.3, V6.1.1 | `ESTRATEGIA_CRIPTOGRAFIA.md`, seção 6.1 | Cifrar em repouso dados pessoais regulados, aplicado ao RA |
+
 ### Conferência cruzada
 
 Toda fonte citada no corpo do documento aparece na lista acima, e o contrário
