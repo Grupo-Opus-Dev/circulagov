@@ -186,10 +186,18 @@ LOGGING = {
             'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
         },
     },
+    'filters': {
+        'sem_quebra_de_linha': {
+            '()': 'auditoria.log_seguro.FiltroQuebraDeLinha',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'seguranca',
+            # Neutraliza quebra de linha (log injection). O arquivo
+            # assinado faz isso no próprio handler.
+            'filters': ['sem_quebra_de_linha'],
         },
         # Assina e encadeia cada linha (ver auditoria/integridade.py).
         # Todo logger filho de "seguranca" passa por aqui automaticamente.

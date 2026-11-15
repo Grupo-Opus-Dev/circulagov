@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from alunos import protecao as protecao_do_ra
+from auditoria.log_seguro import para_log
 from recuperacao_senha.models import MINUTOS_VALIDADE_TOKEN
 from recuperacao_senha.views import enviar_email_recuperacao
 
@@ -78,9 +79,9 @@ def novo_usuario(request):
             com_link = not criado.has_usable_password()
             logger.info(
                 'usuario criado, username=%s, is_staff=%s, senha=%s, criado_por=%s',
-                criado.get_username(), criado.is_staff,
+                para_log(criado.get_username()), criado.is_staff,
                 'por_link' if com_link else 'definida_pelo_gestor',
-                request.user.get_username(),
+                para_log(request.user.get_username()),
             )
 
             if not com_link:

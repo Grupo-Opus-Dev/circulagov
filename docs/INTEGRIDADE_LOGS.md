@@ -128,6 +128,7 @@ e o print do e-mail em
 | Acrescentar linha sem assinatura | Detectado |
 | Verificar com a chave errada | Falha |
 | Quebra de linha dentro do evento (log injection) | Vira espaço, não cria linha falsa |
+| Quebra de linha no log do console (log do container) | Vira o texto `\n`, pelo `para_log` nas chamadas e pelo filtro do handler (`auditoria/log_seguro.py`) |
 | Reiniciar o servidor | A cadeia continua de onde o arquivo parou |
 | Vários processos gravando ao mesmo tempo (workers do Gunicorn) | A cadeia se mantém, nenhuma linha se perde |
 

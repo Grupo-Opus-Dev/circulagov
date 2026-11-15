@@ -10,6 +10,7 @@ from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from auditoria.log_seguro import para_log
 from usuarios import contadores, entrada
 
 from .models import MINUTOS_VALIDADE_TOKEN, TokenRecuperacaoSenha
@@ -59,7 +60,9 @@ def solicitar(request):
                     usuario.get_username())
 
         # Registra a solicitacao de recuperacao (issue #30), independente do usuario existir.
-        logger.info('solicitacao de recuperacao de senha para username=%s', nome_usuario)
+        logger.info(
+        'solicitacao de recuperacao de senha para username=%s',
+        para_log(nome_usuario))
 
         messages.success(request, MENSAGEM_GENERICA)
         return redirect('login')

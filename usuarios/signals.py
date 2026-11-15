@@ -4,6 +4,8 @@ import time
 from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
 from django.dispatch import receiver
 
+from auditoria.log_seguro import para_log
+
 CHAVE_INICIO_SESSAO = 'inicio_sessao'
 
 logger = logging.getLogger('seguranca.autenticacao')
@@ -38,4 +40,6 @@ def registrar_falha_de_login(sender, credentials, request=None, **kwargs):
     """Requisito 5.1. O Django já tira a senha de `credentials` antes de
     disparar esse sinal, mas pegamos só o username mesmo assim, por
     garantia de nunca logar nada além do necessário."""
-    logger.warning('tentativa de login com falha, username=%s', credentials.get('username'))
+    logger.warning(
+        'tentativa de login com falha, username=%s',
+        para_log(credentials.get('username')))
