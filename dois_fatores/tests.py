@@ -1,9 +1,14 @@
+import threading
 import time
+from datetime import datetime
+from datetime import timezone as dt_timezone
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.db import connection
+from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from . import cripto, qrcode_totp
 from usuarios import contadores
@@ -373,3 +378,110 @@ class TesteTravaDoSegundoFator(TestCase):
         with mock.patch('time.time', return_value=time.time() + 4 * 60):
             resposta = self.client.get(reverse('dois_fatores:verificar'))
         self.assertEqual(resposta.status_code, 200)
+
+
+class TesteCodigoDeUsoUnico(TestCase):
+    """Um código TOTP vale uma vez só (RFC 6238, seção 5.2). Sem isso, quem
+    visse ou interceptasse o código conseguiria usá-lo de novo dentro da
+    janela de tolerância, de 30 a 90 segundos."""
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username='uso_unico', password='Senha@12345')
+        self.dispositivo = DispositivoTOTP.objects.create(
+            usuario=self.usuario, confirmado=True)
+        self.gerador = self.dispositivo.totp()
+        self.instante = self.gerador.timecode(timezone.now()) * 30 + 5
+
+    def _no_instante(self, segundos):
+        quando = datetime.fromtimestamp(segundos, tz=dt_timezone.utc)
+        return mock.patch('dois_fatores.models.timezone.now', return_value=quando)
+
+    def _codigo(self, segundos):
+        return self.gerador.at(segundos)
+
+    def _verificar(self, codigo, segundos):
+        with self._no_instante(segundos):
+            dispositivo = DispositivoTOTP.objects.get(pk=self.dispositivo.pk)
+            return dispositivo.verificar_codigo(codigo)
+
+    def test_o_mesmo_codigo_nao_vale_duas_vezes(self):
+        codigo = self._codigo(self.instante)
+
+        self.assertTrue(self._verificar(codigo, self.instante))
+        self.assertFalse(self._verificar(codigo, self.instante + 1))
+
+    def test_codigo_do_intervalo_seguinte_e_aceito(self):
+        self.assertTrue(self._verificar(
+            self._codigo(self.instante), self.instante))
+        self.assertTrue(self._verificar(
+            self._codigo(self.instante + 30), self.instante + 30))
+
+    def test_codigo_mais_antigo_que_o_ultimo_aceito_e_recusado(self):
+        """Quem tem um código anterior, ainda dentro da tolerância de
+        relógio, não entra depois que um mais novo foi usado."""
+        antigo = self._codigo(self.instante)
+        novo = self._codigo(self.instante + 30)
+
+        self.assertTrue(self._verificar(novo, self.instante + 30))
+        self.assertFalse(self._verificar(antigo, self.instante + 30))
+
+    def test_tolerancia_de_um_intervalo_continua_valendo(self):
+        anterior = self._codigo(self.instante - 30)
+        self.assertTrue(self._verificar(anterior, self.instante))
+
+    def test_reuso_fica_registrado_no_log(self):
+        codigo = self._codigo(self.instante)
+        self._verificar(codigo, self.instante)
+
+        with self.assertLogs('seguranca.dois_fatores', 'WARNING') as registro:
+            self._verificar(codigo, self.instante)
+
+        self.assertIn('codigo 2FA ja usado', registro.output[0])
+
+    def test_reuso_pela_tela_de_login_nao_autentica(self):
+        senha = 'Senha@12345'
+        codigo = self._codigo(self.instante)
+        with self._no_instante(self.instante):
+            self.client.post(
+                reverse('login'), {'username': 'uso_unico', 'password': senha})
+            self.client.post(reverse('dois_fatores:verificar'), {'codigo': codigo})
+        self.client.logout()
+
+        outro = Client()
+        with self._no_instante(self.instante + 2):
+            outro.post(
+                reverse('login'), {'username': 'uso_unico', 'password': senha})
+            outro.post(reverse('dois_fatores:verificar'), {'codigo': codigo})
+        resposta = outro.get(reverse('usuarios:inicio'))
+        self.assertNotEqual(resposta.status_code, 200)
+
+
+class TesteCodigoDeUsoUnicoEmParalelo(TransactionTestCase):
+    """Duas requisições ao mesmo tempo com o mesmo código: só uma passa.
+    Teste sequencial não provaria isso, por isso as threads."""
+
+    def test_so_uma_de_varias_tentativas_simultaneas_passa(self):
+        usuario = Usuario.objects.create_user(
+            username='paralelo', password='Senha@12345')
+        dispositivo = DispositivoTOTP.objects.create(
+            usuario=usuario, confirmado=True)
+        codigo = dispositivo.totp().now()
+        largada = threading.Barrier(5)
+        resultados = []
+
+        def tentar():
+            try:
+                copia = DispositivoTOTP.objects.get(pk=dispositivo.pk)
+                largada.wait()
+                resultados.append(copia.verificar_codigo(codigo))
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=tentar) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(sorted(resultados), [False, False, False, False, True])
