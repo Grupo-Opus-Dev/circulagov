@@ -712,3 +712,86 @@ class AncorasDoLogTests(TestCase):
         self.client.force_login(admin)
         resposta = self.client.get(reverse('auditoria:integridade'))
         self.assertContains(resposta, 'Nenhuma âncora conferida')
+
+
+class TesteExpurgoPorRetencao(TestCase):
+    """O comando expurgar apaga só o que venceu e respeita o --dry-run."""
+
+    def setUp(self):
+        from recuperacao_senha.models import TokenRecuperacaoSenha
+
+        self.Token = TokenRecuperacaoSenha
+        self.usuario = Usuario.objects.create_user(
+            username='expurgo', password='SenhaDeTeste123',
+            email='expurgo@escola.test')
+
+    def _token(self, nome, expira_ha_dias):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        return self.Token.objects.create(
+            usuario=self.usuario, token_hash=nome.ljust(64, '0'),
+            expira_em=timezone.now() - timedelta(days=expira_ha_dias))
+
+    def _contador(self, chave, expira_em):
+        from usuarios.models import ContadorDeTentativas
+
+        return ContadorDeTentativas.objects.create(
+            chave=chave.ljust(64, '0'), valor=1, expira_em=expira_em)
+
+    def test_apaga_token_vencido_ha_mais_tempo_que_a_retencao(self):
+        antigo = self._token('a', expira_ha_dias=10)
+        recente = self._token('b', expira_ha_dias=1)
+        valido = self._token('c', expira_ha_dias=-1)
+
+        call_command('expurgar', stdout=StringIO())
+
+        restantes = set(self.Token.objects.values_list('pk', flat=True))
+        self.assertNotIn(antigo.pk, restantes)
+        self.assertIn(recente.pk, restantes)
+        self.assertIn(valido.pk, restantes)
+
+    def test_apaga_contador_vencido_e_mantem_o_que_vale(self):
+        from usuarios.models import ContadorDeTentativas
+
+        self._contador('vencido', time.time() - 60)
+        ativo = self._contador('ativo', time.time() + 600)
+
+        call_command('expurgar', stdout=StringIO())
+
+        self.assertEqual(
+            list(ContadorDeTentativas.objects.values_list('pk', flat=True)),
+            [ativo.pk])
+
+    def test_dry_run_nao_apaga_nada(self):
+        from usuarios.models import ContadorDeTentativas
+
+        self._token('a', expira_ha_dias=10)
+        self._contador('vencido', time.time() - 60)
+        saida = StringIO()
+
+        call_command('expurgar', '--dry-run', stdout=saida)
+
+        self.assertEqual(self.Token.objects.count(), 1)
+        self.assertEqual(ContadorDeTentativas.objects.count(), 1)
+        self.assertIn('Seriam apagados 1 token(s)', saida.getvalue())
+
+    def test_dias_configuravel(self):
+        self._token('a', expira_ha_dias=3)
+
+        call_command('expurgar', '--dias', '2', stdout=StringIO())
+
+        self.assertEqual(self.Token.objects.count(), 0)
+
+    def test_dias_negativo_e_recusado(self):
+        with self.assertRaises(CommandError):
+            call_command('expurgar', '--dias', '-1', stdout=StringIO())
+
+    def test_registra_o_expurgo_no_log_de_seguranca(self):
+        self._token('a', expira_ha_dias=10)
+
+        with self.assertLogs('seguranca.retencao', level='INFO') as registro:
+            call_command('expurgar', stdout=StringIO())
+
+        self.assertIn('tokens=1', registro.output[0])
