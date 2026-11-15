@@ -5,7 +5,7 @@ from django.contrib.auth.forms import (
     SetUnusablePasswordMixin,
 )
 
-from alunos.models import Aluno
+from alunos.models import TAMANHO_MAXIMO_RA, Aluno
 
 Usuario = get_user_model()
 
@@ -56,7 +56,7 @@ class FormularioNovoUsuario(SetUnusablePasswordMixin, BaseUserCreationForm):
     )
 
     ra = forms.CharField(
-        label='RA', required=False,
+        label='RA', required=False, max_length=TAMANHO_MAXIMO_RA,
         help_text='Preencha para vincular um cadastro de aluno.',
     )
     nome_completo = forms.CharField(label='Nome completo', required=False)
@@ -94,7 +94,7 @@ class FormularioNovoUsuario(SetUnusablePasswordMixin, BaseUserCreationForm):
         if nome and not ra:
             self.add_error('ra', 'Informe o RA do aluno.')
 
-        if ra and Aluno.objects.filter(ra=ra).exists():
+        if ra and Aluno.objects.com_ra(ra).exists():
             self.add_error('ra', 'Já existe um aluno com esse RA.')
 
         return dados
@@ -124,7 +124,8 @@ class FormularioEditarUsuario(forms.ModelForm):
     e-mail.
     """
 
-    ra = forms.CharField(label='RA', required=False)
+    ra = forms.CharField(
+        label='RA', required=False, max_length=TAMANHO_MAXIMO_RA)
     nome_completo = forms.CharField(label='Nome completo', required=False)
 
     class Meta:
@@ -177,7 +178,7 @@ class FormularioEditarUsuario(forms.ModelForm):
             self.add_error('ra', 'Informe o RA do aluno.')
 
         if ra:
-            repetido = Aluno.objects.filter(ra=ra).exclude(
+            repetido = Aluno.objects.com_ra(ra).exclude(
                 usuario=self.instance).exists()
             if repetido:
                 self.add_error('ra', 'Já existe outro aluno com esse RA.')

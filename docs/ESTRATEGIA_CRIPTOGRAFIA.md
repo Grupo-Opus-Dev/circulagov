@@ -10,6 +10,7 @@ cada escolha estão em [`JUSTIFICATIVAS_TECNICAS.md`](JUSTIFICATIVAS_TECNICAS.md
 |---|---|---|---|
 | Senha do usuário | Argon2id | `usuarios/hashers.py` | Não aplicável, hash de mão única, sem chave |
 | Segredo do 2FA (TOTP) em repouso | AES-GCM (256 bits) | `dois_fatores/cripto.py` | `CHAVE_CIFRAGEM_2FA` (variável de ambiente, `.env`) |
+| RA do aluno em repouso | AES-GCM (256 bits), com índice HMAC-SHA256 para busca | `alunos/protecao.py` | `CHAVE_CIFRAGEM_2FA`, e uma chave derivada dela para o índice |
 | Token de recuperação de senha | SHA-256 (hash) | `recuperacao_senha/models.py` | Não aplicável, hash de mão única, sem chave |
 | Integridade do log de segurança | HMAC-SHA256 encadeado | `auditoria/integridade.py` | `CHAVE_INTEGRIDADE_LOGS` (variável de ambiente, `.env`) |
 | Tráfego entre navegador e servidor | TLS 1.3 | `config/settings.py` | Certificado do servidor (fora do repositório) |
@@ -103,7 +104,7 @@ Evidência de que isso funciona na prática, incluindo o protocolo
 
 ## 6. Dado em repouso (banco de dados e arquivo de log)
 
-Três estratégias diferentes, dependendo do que o sistema precisa fazer
+Quatro estratégias diferentes, dependendo do que o sistema precisa fazer
 com o dado:
 
 **Hash, sem chave (senha e token de recuperação):** dado que só precisa
@@ -117,6 +118,25 @@ que o usuário digita, então precisa de uma cifra reversível com chave:
 AES-GCM. A chave fica fora do banco e fora do código-fonte, na variável
 de ambiente `CHAVE_CIFRAGEM_2FA` (mesmo padrão já usado pra
 `SECRET_KEY` e pra senha do PostgreSQL).
+
+**Cifragem reversível com índice (RA do aluno):** o RA é o
+identificador do aluno na rede estadual e aparece na gestão e na
+exportação dos dados do titular, então também precisa voltar ao texto
+original. Fica cifrado com AES-GCM, pela mesma rotina do 2FA, com o
+contexto `circulagov:aluno.ra` como dado associado: um RA cifrado não
+decifra se for colado no lugar de outro campo. Como o valor cifrado muda
+a cada gravação, ele não serve para buscar nem para garantir que o RA é
+único. Para isso existe a coluna `ra_indice`, um HMAC-SHA256 do RA com
+uma chave derivada da chave de cifragem: o mesmo RA dá sempre o mesmo
+índice, e sem a chave não se volta ao RA. O custo é que a busca passa a
+achar só o RA completo, não parte dele. Testes em `alunos/tests.py`
+(`TesteRACifradoEmRepouso` e `TesteMigracaoQueCifraORA`).
+
+A chave fica no mesmo servidor do banco. A cifragem protege contra quem
+obtém só o banco ou uma cópia dele (um dump, um volume copiado); quem
+controla o servidor inteiro lê a chave e decifra. O nome de usuário da
+conta também pode ser o próprio RA, se quem criou a conta escolheu
+assim, e esse campo não é cifrado porque é usado no login.
 
 **Assinatura encadeada, com chave (log de segurança):** dado que
 precisa ser lido em texto puro (é um log, alguém precisa poder ler as
