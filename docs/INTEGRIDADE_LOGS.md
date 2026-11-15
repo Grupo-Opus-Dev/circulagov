@@ -111,6 +111,13 @@ O mesmo teste foi feito pela tela `/auditoria/integridade/` com o
 servidor rodando: antes da alteração, "Log íntegro: 13 linhas
 verificadas"; depois, "Log alterado na linha 5".
 
+**Âncora fora do servidor, em produção.** Desde 15/11/2026 a âncora é
+emitida todo dia pelo `cron` da VPS e enviada por e-mail para integrantes
+do grupo. O registro do primeiro envio, com a âncora recebida, está em
+[`evidencias/18-evidencia-ancora-agendada-2026-11-15.txt`](evidencias/18-evidencia-ancora-agendada-2026-11-15.txt),
+e o print do e-mail em
+[`evidencias/19-ancora-recebida-por-email-2026-11-15.png`](evidencias/19-ancora-recebida-por-email-2026-11-15.png).
+
 ## Ataques cobertos pelos testes
 
 | Ataque | Resultado |

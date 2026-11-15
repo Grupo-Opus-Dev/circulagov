@@ -360,6 +360,9 @@ Para testar na hora, sem esperar o horário:
 tail ~/circulagov-cron.log
 ```
 
+Instalado em produção em 15/11/2026. Registro do teste, com a âncora recebida
+por e-mail: [`evidencias/18-evidencia-ancora-agendada-2026-11-15.txt`](evidencias/18-evidencia-ancora-agendada-2026-11-15.txt).
+
 ## Se a cadeia do log quebrar
 
 A tela `/auditoria/integridade/` e o comando `verificar_logs` mostram

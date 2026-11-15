@@ -1,0 +1,47 @@
+Evidencia da ancora do log enviada para fora do servidor, capturada em 15/11/2026 19:15 -0300
+Endereco: https://circulagov.nossoprojeto.app.br
+Versao no ar: main em 4d498da (PRs #130 a #133)
+Requisito: 5.3, protecao contra alteracao dos logs (armazenamento externo das ancoras)
+
+### 1. Migracao do RA cifrado aplicada em producao
+comando: docker compose exec web python manage.py showmigrations alunos
+    alunos
+     [X] 0001_initial
+     [X] 0002_ra_cifrado
+
+### 2. Envio por SMTP configurado
+comando: docker compose exec web python manage.py shell -c "from django.conf import settings; print(settings.EMAIL_BACKEND)"
+    django.core.mail.backends.smtp.EmailBackend
+
+### 3. Destino da ancora no .env da VPS (fora do repositorio, que e publico)
+    ANCORA_EMAIL=[e-mail de um integrante]
+
+### 4. Tarefas instaladas no cron da VPS (deploy/cron/circulagov.cron)
+comando: (crontab -l 2>/dev/null; cat deploy/cron/circulagov.cron) | crontab -
+    0 3 * * * $HOME/apps/circulagov/deploy/tarefas-agendadas.sh ancora >> $HOME/circulagov-cron.log 2>&1
+    30 3 * * * $HOME/apps/circulagov/deploy/tarefas-agendadas.sh expurgo >> $HOME/circulagov-cron.log 2>&1
+    Horarios em UTC: 03:00 UTC e meia-noite em Brasilia.
+
+### 5. Teste manual da tarefa, sem esperar o horario
+comando: ./deploy/tarefas-agendadas.sh ancora
+resultado: ancora emitida, gravada em logs/ancoras.log e enviada por e-mail.
+
+Ancora recebida no e-mail, em 15/11/2026 19:15 -0300
+(print em 19-ancora-recebida-por-email-2026-11-15.png):
+    ancora linhas=158 mac=49027c5c1b34c93acd155dd120132a7311f76836008ceb92d5e11a6392654b64 em=2026-11-15T22:15:00+00:00 | sig=a64c63118bf5cef528a9910388a3b308611b0fe59238e54699767013adb0ee90
+
+O que a ancora diz: em 15/11/2026 22:15 UTC o log de seguranca tinha 158
+linhas, e a ultima tinha o MAC acima. A assinatura (sig) e feita com a chave
+do log, entao ninguem forja uma ancora sem a chave. Publicar a ancora nao
+revela a chave.
+
+### Como conferir
+Com a ancora acima salva num arquivo, quem tem acesso ao servidor confere se
+o log ainda contem essas 158 linhas intactas:
+
+    docker compose exec -T web sh -c 'cat > /tmp/ancoras.txt' < ancoras.txt
+    docker compose exec web python manage.py verificar_logs --ancoras /tmp/ancoras.txt
+
+Se alguem apagar o final do log depois de 22:15 UTC de 15/11/2026, a
+verificacao reprova. Ver docs/INTEGRIDADE_LOGS.md e docs/DEPLOY.md, secao
+"Tarefas agendadas".
