@@ -361,6 +361,12 @@ Disponível em:
 https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf.
 Acesso em: 24 set. 2026.
 
+FAGANELLO, D. M. (coord.); CARVALHO, M. M. de; SILVA, F. T. da. **Elaboração
+de referências**: orientações. 2. ed. Mogi das Cruzes: Universidade de Mogi das
+Cruzes, 2019. Disponível em:
+https://www.umc.br/wp-content/uploads/2024/08/referencias.pdf. Acesso em: 15
+nov. 2026.
+
 HODGES, J.; JACKSON, C.; BARTH, A. **HTTP strict transport security (HSTS)**.
 [S. l.]: IETF, nov. 2012. (RFC 6797). Disponível em:
 https://www.rfc-editor.org/rfc/rfc6797.txt. Acesso em: 24 set. 2026.
@@ -383,12 +389,6 @@ SCHNEIER, B.; KELSEY, J. Secure audit logs to support computer forensics.
 p. 159-176, maio 1999. DOI: 10.1145/317087.317089. Disponível em:
 https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf. Acesso
 em: 24 set. 2026.
-
-FAGANELLO, Decléia Maria (coord.); CARVALHO, Maísa Martins de; SILVA,
-Fabiane Tavares da. **Elaboração de referências: orientações**. 2. ed.
-Mogi das Cruzes: Universidade de Mogi das Cruzes, 2019. Disponível em:
-https://www.umc.br/wp-content/uploads/2024/08/referencias.pdf. Acesso
-em: 15 nov. 2026.
 
 ### Fontes citadas em outros documentos
 
