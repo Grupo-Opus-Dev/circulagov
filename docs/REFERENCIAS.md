@@ -14,9 +14,11 @@ permite. Meses vêm abreviados, exceto maio. Para leis, a ementa é obrigatória
 Endereços eletrônicos vão sem os sinais `< >`, que a versão de 2018 dispensou.
 A lista consolidada, em ordem alfabética, está na seção 11.
 
-O guia prático consultado para os exemplos de formatação foi o da Biblioteca
-Universitária da UFSC, também listado na seção 11. A norma em si não foi
-acessada, por ser de assinatura paga.
+O guia prático consultado para os exemplos de formatação foi a apostila
+oficial da UMC, publicada pela Biblioteca Central e também listada na
+seção 11. A apostila é derivada da ABNT NBR 6023:2018 e endossada pela
+própria instituição, que mantém a norma original disponível no acervo
+impresso da Biblioteca Central e online pelo sistema Target GEDWeb.
 
 ---
 
@@ -359,6 +361,12 @@ Disponível em:
 https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf.
 Acesso em: 24 set. 2026.
 
+FAGANELLO, D. M. (coord.); CARVALHO, M. M. de; SILVA, F. T. da. **Elaboração
+de referências**: orientações. 2. ed. Mogi das Cruzes: Universidade de Mogi das
+Cruzes, 2019. Disponível em:
+https://www.umc.br/wp-content/uploads/2024/08/referencias.pdf. Acesso em: 15
+nov. 2026.
+
 HODGES, J.; JACKSON, C.; BARTH, A. **HTTP strict transport security (HSTS)**.
 [S. l.]: IETF, nov. 2012. (RFC 6797). Disponível em:
 https://www.rfc-editor.org/rfc/rfc6797.txt. Acesso em: 24 set. 2026.
@@ -381,11 +389,6 @@ SCHNEIER, B.; KELSEY, J. Secure audit logs to support computer forensics.
 p. 159-176, maio 1999. DOI: 10.1145/317087.317089. Disponível em:
 https://www.schneier.com/wp-content/uploads/2016/02/paper-auditlogs.pdf. Acesso
 em: 24 set. 2026.
-
-UNIVERSIDADE FEDERAL DE SANTA CATARINA. Biblioteca Universitária.
-**Procedimentos para elaboração de referências (ABNT NBR 6023:2018)**.
-Florianópolis: UFSC, 2019. Disponível em:
-https://repositorio.ufsc.br/handle/123456789/194316. Acesso em: 24 set. 2026.
 
 ### Fontes citadas em outros documentos
 
@@ -422,7 +425,7 @@ também vale.
 | 6 | DWORKIN |
 | 7 | HODGES; JACKSON; BARTH |
 | 8 | BRASIL |
-| Nota de normalização | UNIVERSIDADE FEDERAL DE SANTA CATARINA |
+| Nota de normalização | FAGANELLO; CARVALHO; SILVA |
 
 ### Observações sobre a normalização
 
