@@ -236,7 +236,7 @@ jobs:
             -days 1 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost"
           docker run -d --name proxy-tls --network host \
             -v "$PWD/deploy/dast/nginx-dast.conf:/etc/nginx/nginx.conf:ro" \
-            -v /tmp/certs:/certs:ro nginx:1.24-alpine
+            -v /tmp/certs:/certs:ro nginx:1.30-alpine
 
       - name: Esperar a aplicacao responder
         run: |
