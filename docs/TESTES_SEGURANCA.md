@@ -327,6 +327,8 @@ item do parecer que ele responde.
 | `ParaLogTests`, `FiltroDoConsoleTests`, `CampoDoUsuarioNoLogTests` | `auditoria/tests_log_seguro.py` | 5.1 e 5.3 | Uma quebra de linha digitada no campo de usuário não cria linha falsa no log do console (log injection) |
 | `TesteCodigoDeUsoUnico` | `dois_fatores/tests.py` | 1.5 e 1.6 | O mesmo código do 2FA não vale duas vezes, nem um código mais antigo que o último aceito |
 | `TesteCodigoDeUsoUnicoEmParalelo` | `dois_fatores/tests.py` | 1.5 e 1.6 | Cinco tentativas simultâneas com o mesmo código: só uma passa |
+| `SuperusuarioNaoSeExcluiTests` | `direitos_titular/tests.py` | 4.10 | Superusuário não exclui a própria conta por "Meus dados": a confirmação não mostra o botão e o POST direto é recusado |
+| `RegraDeExclusaoTests`, `ExclusaoPeloAdminTests` | `usuarios/tests_exclusao.py` | 4.10 | No admin, superusuário não se exclui, nem sozinho nem na exclusão em lote, e só outro superusuário consegue excluí-lo |
 
 ## Execução contínua
 

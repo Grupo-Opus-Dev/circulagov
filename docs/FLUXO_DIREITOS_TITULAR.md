@@ -80,6 +80,17 @@ seus relacionamentos com `Usuario`, o próprio banco de dados apaga
 automaticamente todos os registros relacionados, sem necessidade de
 apagar cada tabela manualmente.
 
+**Superusuário não se exclui sozinho.** Uma conta de superusuário que
+pede a exclusão em "Meus dados" vê na confirmação o aviso de que só outro
+superusuário pode excluí-la, sem o botão de excluir; um POST direto na
+view `excluir` também é recusado e entra no log de segurança. No admin do
+Django vale a mesma regra: superusuário não exclui a própria conta, e
+quem não é superusuário não exclui um superusuário. Assim quem exclui
+continua existindo, e o sistema nunca fica sem administrador desse nível.
+A regra está em `usuarios/exclusao.py` e os testes em
+`usuarios/tests_exclusao.py` e `direitos_titular/tests.py`
+(`SuperusuarioNaoSeExcluiTests`).
+
 #### Alcance da exclusão
 
 O que some na hora e o que sobra depois que a conta é excluída:

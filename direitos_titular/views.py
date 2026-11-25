@@ -1,7 +1,13 @@
-﻿from django.contrib.auth import logout
+﻿import logging
+
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+
+from usuarios.exclusao import pode_excluir
+
+logger = logging.getLogger('seguranca.direitos_titular')
 
 
 def _coletar_dados_pessoais(usuario):
@@ -63,7 +69,9 @@ def exportar(request):
 @login_required
 def confirmar_exclusao(request):
     """Tela intermediária antes de excluir, pra evitar clique acidental."""
-    return render(request, 'direitos_titular/confirmar_exclusao.html')
+    return render(request, 'direitos_titular/confirmar_exclusao.html', {
+        'exclusao_bloqueada': not pode_excluir(request.user, request.user),
+    })
 
 
 @login_required
@@ -78,6 +86,13 @@ def excluir(request):
         return redirect('direitos_titular:confirmar_exclusao')
 
     usuario = request.user
+    # Superusuário só é excluído por outro superusuário (usuarios/exclusao.py).
+    if not pode_excluir(usuario, usuario):
+        logger.warning(
+            'autoexclusao de superusuario recusada, username=%s',
+            usuario.get_username())
+        return redirect('direitos_titular:confirmar_exclusao')
+
     logout(request)
     usuario.delete()
     return redirect('login')
