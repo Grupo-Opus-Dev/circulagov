@@ -144,3 +144,39 @@ class ExcluirDadosViewTests(TestCase):
         resposta = self.client.get(
             reverse('direitos_titular:confirmar_exclusao'))
         self.assertEqual(resposta.status_code, 302)
+
+
+class SuperusuarioNaoSeExcluiTests(TestCase):
+    """Superusuário só é excluído por outro superusuário, para o sistema
+    não ficar sem administrador."""
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser(
+            username='admin_teste', password='Senha@123', email='admin@exemplo.com')
+        self.client.force_login(self.admin)
+
+    def test_post_nao_exclui_o_superusuario(self):
+        with self.assertLogs('seguranca.direitos_titular', 'WARNING'):
+            resposta = self.client.post(reverse('direitos_titular:excluir'))
+
+        self.assertRedirects(
+            resposta, reverse('direitos_titular:confirmar_exclusao'))
+        self.assertTrue(Usuario.objects.filter(pk=self.admin.pk).exists())
+
+    def test_superusuario_continua_logado(self):
+        self.client.post(reverse('direitos_titular:excluir'))
+        resposta = self.client.get(reverse('direitos_titular:consultar'))
+        self.assertEqual(resposta.status_code, 200)
+
+    def test_confirmacao_explica_e_nao_mostra_o_botao(self):
+        resposta = self.client.get(
+            reverse('direitos_titular:confirmar_exclusao'))
+        self.assertContains(resposta, 'outro superusuário')
+        self.assertNotContains(resposta, 'Sim, excluir permanentemente')
+
+    def test_gestor_sem_superusuario_pode_se_excluir(self):
+        gestor = Usuario.objects.create_user(
+            username='gestor_teste', password='Senha@123', is_staff=True)
+        self.client.force_login(gestor)
+        self.client.post(reverse('direitos_titular:excluir'))
+        self.assertFalse(Usuario.objects.filter(pk=gestor.pk).exists())

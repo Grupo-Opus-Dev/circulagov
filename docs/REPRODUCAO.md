@@ -62,13 +62,14 @@ python manage.py test --no-input
 Saída esperada no fim:
 
 ```
-Ran 313 tests in ...s
+Ran 324 tests in ...s
 
 OK
 ```
 
-São 313 na `main` atual: os 312 da última linha da tabela mais o teste de
-expurgo de sessões vencidas. Na v1.5.1 eram 259. O tempo varia com a
+São 324 na `main` atual: os 312 da última linha da tabela, mais o teste de
+expurgo de sessões vencidas e os 11 que impedem o superusuário de excluir a
+própria conta. Na v1.5.1 eram 259. O tempo varia com a
 máquina.
 
 ### O que os testes provam e o que não provam
